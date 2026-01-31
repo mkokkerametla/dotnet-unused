@@ -22,6 +22,7 @@ Detect and highlight unused code in .NET solutions directly in Visual Studio Cod
 This extension requires the `dotnet-unused` CLI tool. **Don't worry** - the extension will offer to install it automatically if it's not found!
 
 **Manual installation:**
+
 ```bash
 dotnet tool install --global dotnetunused
 ```
@@ -46,6 +47,7 @@ Access commands via Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 ### Tree View
 
 The "Dotnet Unused" sidebar panel shows:
+
 - Unused symbols grouped by type (Methods, Properties, Fields)
 - File location and line number for each symbol
 - Click any item to jump to its definition
@@ -98,14 +100,17 @@ The extension integrates with the `dotnet-unused` CLI tool:
 The extension will offer to install the CLI automatically. Just click "Install Automatically" when prompted!
 
 **Manual Installation:**
+
 ```bash
 dotnet tool install --global dotnetunused
 ```
 
 Or use the Command Palette:
+
 - `Ctrl+Shift+P` → "Dotnet Unused: Install/Update CLI Tool"
 
 **Custom Path:**
+
 ```json
 {
   "dotnet-unused.cliPath": "C:\\path\\to\\dotnet-unused.exe"

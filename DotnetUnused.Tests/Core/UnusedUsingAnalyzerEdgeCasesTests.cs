@@ -17,11 +17,15 @@ public class UnusedUsingAnalyzerEdgeCasesTests
     [InlineData("using static System.Math;", "System.Math")] // static keyword handled by Roslyn
     [InlineData("global using System.Collections;", "System.Collections")] // global keyword
     [InlineData("global using static System.Console;", "System.Console")] // combined global + static
-    [InlineData("using MyAlias = System.Collections.Generic.List<int>;", "System.Collections.Generic.List<int>")] // alias
+    [InlineData(
+        "using MyAlias = System.Collections.Generic.List<int>;",
+        "System.Collections.Generic.List<int>"
+    )] // alias
     public void ExtractNamespace_HandlesEdgeCases(string usingStatement, string expectedNamespace)
     {
         // Arrange
-        var sourceCode = $@"
+        var sourceCode =
+            $@"
 {usingStatement}
 
 namespace TestProject
@@ -50,7 +54,8 @@ namespace TestProject
     public void NamespaceWithUsingInName_IsNotCorrupted()
     {
         // This is the specific bug case mentioned in the review
-        var sourceCode = @"
+        var sourceCode =
+            @"
 using MyApp.UsingHelpers;
 
 namespace TestProject

@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
+using DotnetUnused.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using DotnetUnused.Models;
 
 namespace DotnetUnused.Core;
 
@@ -16,7 +16,8 @@ public sealed class SymbolIndexer
     public async Task<ConcurrentBag<SymbolDefinition>> CollectDeclaredSymbolsAsync(
         Solution solution,
         IProgress<string>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var declaredSymbols = new ConcurrentBag<SymbolDefinition>();
 
@@ -24,62 +25,71 @@ public sealed class SymbolIndexer
         progress?.Report($"Indexing symbols from {projects.Count} projects...");
 
         // Process projects in parallel
-        await Parallel.ForEachAsync(projects, cancellationToken, async (project, ct) =>
-        {
-            var compilation = await project.GetCompilationAsync(ct);
-            if (compilation == null)
+        await Parallel.ForEachAsync(
+            projects,
+            cancellationToken,
+            async (project, ct) =>
             {
-                return;
-            }
-
-            foreach (var syntaxTree in compilation.SyntaxTrees)
-            {
-                var filePath = syntaxTree.FilePath;
-
-                // Skip generated files
-                if (!ShouldAnalyze(filePath))
+                var compilation = await project.GetCompilationAsync(ct);
+                if (compilation == null)
                 {
-                    continue;
+                    return;
                 }
 
-                var root = await syntaxTree.GetRootAsync(ct);
-                var semanticModel = compilation.GetSemanticModel(syntaxTree);
-
-                // Walk the syntax tree and collect declarations
-                var declarations = root.DescendantNodes().ToList();
-
-                foreach (var node in declarations)
+                foreach (var syntaxTree in compilation.SyntaxTrees)
                 {
-                    ISymbol? symbol = null;
+                    var filePath = syntaxTree.FilePath;
 
-                    switch (node)
+                    // Skip generated files
+                    if (!ShouldAnalyze(filePath))
                     {
-                        case MethodDeclarationSyntax method:
-                            symbol = semanticModel.GetDeclaredSymbol(method, ct);
-                            break;
-                        case PropertyDeclarationSyntax property:
-                            symbol = semanticModel.GetDeclaredSymbol(property, ct);
-                            break;
-                        case FieldDeclarationSyntax field:
-                            // Fields can have multiple variable declarators
-                            foreach (var variable in field.Declaration.Variables)
-                            {
-                                var fieldSymbol = semanticModel.GetDeclaredSymbol(variable, ct);
-                                if (fieldSymbol != null && ShouldIndexSymbol(fieldSymbol))
+                        continue;
+                    }
+
+                    var root = await syntaxTree.GetRootAsync(ct);
+                    var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+                    // Walk the syntax tree and collect declarations
+                    var declarations = root.DescendantNodes().ToList();
+
+                    foreach (var node in declarations)
+                    {
+                        ISymbol? symbol = null;
+
+                        switch (node)
+                        {
+                            case MethodDeclarationSyntax method:
+                                symbol = semanticModel.GetDeclaredSymbol(method, ct);
+                                break;
+                            case PropertyDeclarationSyntax property:
+                                symbol = semanticModel.GetDeclaredSymbol(property, ct);
+                                break;
+                            case FieldDeclarationSyntax field:
+                                // Fields can have multiple variable declarators
+                                foreach (var variable in field.Declaration.Variables)
                                 {
-                                    declaredSymbols.Add(new SymbolDefinition(fieldSymbol, variable.GetLocation()));
+                                    var fieldSymbol = semanticModel.GetDeclaredSymbol(variable, ct);
+                                    if (fieldSymbol != null && ShouldIndexSymbol(fieldSymbol))
+                                    {
+                                        declaredSymbols.Add(
+                                            new SymbolDefinition(
+                                                fieldSymbol,
+                                                variable.GetLocation()
+                                            )
+                                        );
+                                    }
                                 }
-                            }
-                            continue; // Skip the default handling
-                    }
+                                continue; // Skip the default handling
+                        }
 
-                    if (symbol != null && ShouldIndexSymbol(symbol))
-                    {
-                        declaredSymbols.Add(new SymbolDefinition(symbol, node.GetLocation()));
+                        if (symbol != null && ShouldIndexSymbol(symbol))
+                        {
+                            declaredSymbols.Add(new SymbolDefinition(symbol, node.GetLocation()));
+                        }
                     }
                 }
             }
-        });
+        );
 
         progress?.Report($"Found {declaredSymbols.Count} declared symbols");
         return declaredSymbols;
@@ -131,9 +141,11 @@ public sealed class SymbolIndexer
         }
 
         // Only index method, property, and field symbols
-        if (symbol.Kind != SymbolKind.Method &&
-            symbol.Kind != SymbolKind.Property &&
-            symbol.Kind != SymbolKind.Field)
+        if (
+            symbol.Kind != SymbolKind.Method
+            && symbol.Kind != SymbolKind.Property
+            && symbol.Kind != SymbolKind.Field
+        )
         {
             return false;
         }

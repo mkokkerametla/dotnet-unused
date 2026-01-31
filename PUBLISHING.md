@@ -15,6 +15,7 @@ This guide covers how to publish DotnetUnused as both a .NET Global Tool and sta
 This uses GitHub Actions to automatically build and publish when you create a tag.
 
 1. **Update version** in `DotnetUnused/DotnetUnused.csproj`:
+
    ```xml
    <Version>1.0.1</Version>
    ```
@@ -22,6 +23,7 @@ This uses GitHub Actions to automatically build and publish when you create a ta
 2. **Update CHANGELOG.md** with release notes
 
 3. **Commit changes**:
+
    ```bash
    git add .
    git commit -m "Bump version to 1.0.1"
@@ -29,6 +31,7 @@ This uses GitHub Actions to automatically build and publish when you create a ta
    ```
 
 4. **Create and push tag**:
+
    ```bash
    git tag v1.0.1
    git push upstream v1.0.1
@@ -109,6 +112,7 @@ Follow [Semantic Versioning](https://semver.org/):
 - **PATCH** (x.x.1): Bug fixes
 
 ### Examples:
+
 - `1.0.0`: Initial release
 - `1.0.1`: Bug fix
 - `1.1.0`: Add new feature (e.g., unused using directives)
@@ -135,14 +139,17 @@ Follow [Semantic Versioning](https://semver.org/):
 ## Troubleshooting
 
 ### "Package already exists" error
+
 - You can't republish the same version to NuGet
 - Increment the version number and try again
 
 ### "NuGet API key invalid"
+
 - Regenerate your API key at https://www.nuget.org/account/apikeys
 - Update GitHub secret if using Actions
 
 ### Build warnings
+
 - The 3 warnings (nullability, obsolete API) are non-critical
 - They don't affect functionality
 

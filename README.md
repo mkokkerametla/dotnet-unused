@@ -29,14 +29,14 @@ dotnet-unused MySolution.sln
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--format, -f` | Output format: `text` or `json` (default: `text`) |
-| `--output, -o` | Output file path (for JSON format) |
-| `--exclude-public` | Exclude public members (default: `true`) |
-| `--skip-usings` | Skip unused using directives analysis |
-| `--fix` | Automatically remove unused usings |
-| `--unused-packages` | Detect unused NuGet packages |
+| Option              | Description                                       |
+| ------------------- | ------------------------------------------------- |
+| `--format, -f`      | Output format: `text` or `json` (default: `text`) |
+| `--output, -o`      | Output file path (for JSON format)                |
+| `--exclude-public`  | Exclude public members (default: `true`)          |
+| `--skip-usings`     | Skip unused using directives analysis             |
+| `--fix`             | Automatically remove unused usings                |
+| `--unused-packages` | Detect unused NuGet packages                      |
 
 ### Examples
 

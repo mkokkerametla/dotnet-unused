@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using Microsoft.CodeAnalysis;
 using DotnetUnused.Models;
+using Microsoft.CodeAnalysis;
 
 namespace DotnetUnused.Core;
 
@@ -23,7 +23,8 @@ public sealed class UnusedDetector
     public AnalysisResult DetectUnused(
         ConcurrentBag<SymbolDefinition> declaredSymbols,
         ConcurrentBag<ISymbol> referencedSymbols,
-        IProgress<string>? progress = null)
+        IProgress<string>? progress = null
+    )
     {
         progress?.Report("Computing unused symbols...");
 
@@ -133,8 +134,14 @@ public sealed class UnusedDetector
         foreach (var attr in attributes)
         {
             var attrName = attr.AttributeClass?.Name;
-            if (attrName is "FactAttribute" or "TestAttribute" or
-                "TestMethodAttribute" or "TheoryAttribute" or "TestCaseAttribute")
+            if (
+                attrName
+                is "FactAttribute"
+                    or "TestAttribute"
+                    or "TestMethodAttribute"
+                    or "TheoryAttribute"
+                    or "TestCaseAttribute"
+            )
             {
                 return true;
             }
@@ -168,9 +175,15 @@ public sealed class UnusedDetector
             foreach (var attr in attributes)
             {
                 var attrName = attr.AttributeClass?.Name;
-                if (attrName is "HttpGetAttribute" or "HttpPostAttribute" or
-                    "HttpPutAttribute" or "HttpDeleteAttribute" or
-                    "HttpPatchAttribute" or "RouteAttribute")
+                if (
+                    attrName
+                    is "HttpGetAttribute"
+                        or "HttpPostAttribute"
+                        or "HttpPutAttribute"
+                        or "HttpDeleteAttribute"
+                        or "HttpPatchAttribute"
+                        or "RouteAttribute"
+                )
                 {
                     return true;
                 }
@@ -189,8 +202,13 @@ public sealed class UnusedDetector
             foreach (var attr in attributes)
             {
                 var attrName = attr.AttributeClass?.Name;
-                if (attrName is "JsonPropertyNameAttribute" or "JsonPropertyAttribute" or
-                    "DataMemberAttribute" or "XmlElementAttribute")
+                if (
+                    attrName
+                    is "JsonPropertyNameAttribute"
+                        or "JsonPropertyAttribute"
+                        or "DataMemberAttribute"
+                        or "XmlElementAttribute"
+                )
                 {
                     return true;
                 }
@@ -236,22 +254,36 @@ public sealed class UnusedDetector
 
         // Check for common XAML/WPF event handler naming patterns
         var name = method.Name;
-        if (name.Contains("_Click") || name.Contains("_OnClick") ||
-            name.Contains("_Loaded") || name.Contains("_OnLoaded") ||
-            name.Contains("_Changed") || name.Contains("_OnChanged") ||
-            name.Contains("_Checked") || name.Contains("_OnChecked") ||
-            name.Contains("_Selected") || name.Contains("_OnSelected") ||
-            name.Contains("_Closing") || name.Contains("_Closed") ||
-            name.StartsWith("On") || name.StartsWith("Handle") ||
-            name.EndsWith("Handler") || name.EndsWith("_Click") ||
-            name.EndsWith("_OnClick"))
+        if (
+            name.Contains("_Click")
+            || name.Contains("_OnClick")
+            || name.Contains("_Loaded")
+            || name.Contains("_OnLoaded")
+            || name.Contains("_Changed")
+            || name.Contains("_OnChanged")
+            || name.Contains("_Checked")
+            || name.Contains("_OnChecked")
+            || name.Contains("_Selected")
+            || name.Contains("_OnSelected")
+            || name.Contains("_Closing")
+            || name.Contains("_Closed")
+            || name.StartsWith("On")
+            || name.StartsWith("Handle")
+            || name.EndsWith("Handler")
+            || name.EndsWith("_Click")
+            || name.EndsWith("_OnClick")
+        )
         {
             // Check if it has event handler signature (sender, args) or no parameters
             var parameters = method.Parameters;
-            if (parameters.Length == 0 ||
-                (parameters.Length == 2 &&
-                 parameters[0].Type.Name == "Object" &&
-                 parameters[1].Type.Name.Contains("EventArgs")))
+            if (
+                parameters.Length == 0
+                || (
+                    parameters.Length == 2
+                    && parameters[0].Type.Name == "Object"
+                    && parameters[1].Type.Name.Contains("EventArgs")
+                )
+            )
             {
                 return true;
             }

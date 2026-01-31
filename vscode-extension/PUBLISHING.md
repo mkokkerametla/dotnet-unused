@@ -5,6 +5,7 @@ This document explains how the VS Code extension is published automatically via 
 ## Automatic Publishing
 
 The VS Code extension is automatically built and published when you:
+
 1. Push a git tag (e.g., `v1.0.1`)
 2. Manually trigger the release workflow
 
@@ -24,6 +25,7 @@ You need to add your Visual Studio Marketplace Personal Access Token as a GitHub
 ### 2. How the Workflow Works
 
 When triggered, the workflow:
+
 1. ✅ Installs GitVersion and calculates version
 2. ✅ Sets up Node.js environment
 3. ✅ Installs npm dependencies
@@ -36,6 +38,7 @@ When triggered, the workflow:
 ### 3. Version Synchronization
 
 The extension version is automatically synchronized with the CLI tool version using GitVersion:
+
 - Both CLI and extension use the same version number
 - No manual version updates needed
 - GitVersion calculates version from git history
@@ -61,11 +64,13 @@ npx @vscode/vsce publish
 ## Workflow Behavior
 
 ### On Tag Push (`git push --tags`)
+
 - ✅ Builds and packages extension
 - ✅ Publishes to VS Code Marketplace
 - ✅ Uploads .vsix to GitHub Release
 
 ### On Manual Workflow Dispatch
+
 - ✅ Builds and packages extension
 - ✅ Uploads .vsix to GitHub Release
 - ⏭️ Skips marketplace publishing (for testing)
@@ -73,15 +78,19 @@ npx @vscode/vsce publish
 ## Troubleshooting
 
 ### "VSCE_PAT secret not found"
+
 Add the secret in GitHub repository settings (see Setup Requirements above)
 
 ### "Publishing failed"
+
 Check that:
+
 - Your PAT is still valid (they expire!)
 - Publisher ID matches in package.json
 - Extension version doesn't already exist on marketplace
 
 ### "Version already exists"
+
 GitVersion will automatically increment the version on the next commit/tag
 
 ## Security Notes

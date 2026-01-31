@@ -17,7 +17,8 @@ public sealed class ReferenceWalker
     public async Task<ConcurrentBag<ISymbol>> CollectReferencedSymbolsAsync(
         Solution solution,
         IProgress<string>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var referencedSymbols = new ConcurrentBag<ISymbol>();
 
@@ -25,32 +26,36 @@ public sealed class ReferenceWalker
         progress?.Report($"Finding symbol references in {projects.Count} projects...");
 
         // Process projects in parallel
-        await Parallel.ForEachAsync(projects, cancellationToken, async (project, ct) =>
-        {
-            var compilation = await project.GetCompilationAsync(ct);
-            if (compilation == null)
+        await Parallel.ForEachAsync(
+            projects,
+            cancellationToken,
+            async (project, ct) =>
             {
-                return;
-            }
-
-            foreach (var syntaxTree in compilation.SyntaxTrees)
-            {
-                var filePath = syntaxTree.FilePath;
-
-                // Skip generated files
-                if (!ShouldAnalyze(filePath))
+                var compilation = await project.GetCompilationAsync(ct);
+                if (compilation == null)
                 {
-                    continue;
+                    return;
                 }
 
-                var root = await syntaxTree.GetRootAsync(ct);
-                var semanticModel = compilation.GetSemanticModel(syntaxTree);
+                foreach (var syntaxTree in compilation.SyntaxTrees)
+                {
+                    var filePath = syntaxTree.FilePath;
 
-                // Single-pass traversal of the syntax tree
-                var walker = new SymbolReferenceWalker(semanticModel, referencedSymbols, ct);
-                walker.Visit(root);
+                    // Skip generated files
+                    if (!ShouldAnalyze(filePath))
+                    {
+                        continue;
+                    }
+
+                    var root = await syntaxTree.GetRootAsync(ct);
+                    var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+                    // Single-pass traversal of the syntax tree
+                    var walker = new SymbolReferenceWalker(semanticModel, referencedSymbols, ct);
+                    walker.Visit(root);
+                }
             }
-        });
+        );
 
         progress?.Report($"Found {referencedSymbols.Count} symbol references");
         return referencedSymbols;
@@ -70,7 +75,8 @@ public sealed class ReferenceWalker
         public SymbolReferenceWalker(
             SemanticModel semanticModel,
             ConcurrentBag<ISymbol> references,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             _semanticModel = semanticModel;
             _references = references;
@@ -151,28 +157,41 @@ public sealed class ReferenceWalker
         private void AddReference(ISymbol symbol)
         {
             // Unwrap property accessors to their containing property
-            if (symbol is IMethodSymbol method && (method.MethodKind == MethodKind.PropertyGet || method.MethodKind == MethodKind.PropertySet))
+            if (
+                symbol is IMethodSymbol method
+                && (
+                    method.MethodKind == MethodKind.PropertyGet
+                    || method.MethodKind == MethodKind.PropertySet
+                )
+            )
             {
                 symbol = method.AssociatedSymbol ?? symbol;
             }
 
             // Unwrap constructed generic methods to their original definitions
             // e.g., GetAsync<MyClass>() should map to GetAsync<T>()
-            if (symbol is IMethodSymbol methodSymbol && methodSymbol.IsGenericMethod && !methodSymbol.IsDefinition)
+            if (
+                symbol is IMethodSymbol methodSymbol
+                && methodSymbol.IsGenericMethod
+                && !methodSymbol.IsDefinition
+            )
             {
                 symbol = methodSymbol.OriginalDefinition;
             }
 
             // Unwrap methods/properties/fields of constructed generic types
             // e.g., List<int>.Add should map to List<T>.Add
-            if (symbol.ContainingType is INamedTypeSymbol containingType &&
-                containingType.IsGenericType &&
-                !containingType.IsDefinition)
+            if (
+                symbol.ContainingType is INamedTypeSymbol containingType
+                && containingType.IsGenericType
+                && !containingType.IsDefinition
+            )
             {
                 var originalType = containingType.OriginalDefinition;
 
                 // Find the corresponding member in the original definition
-                var originalMember = originalType.GetMembers(symbol.Name)
+                var originalMember = originalType
+                    .GetMembers(symbol.Name)
                     .FirstOrDefault(m => m.Kind == symbol.Kind);
 
                 if (originalMember != null)
@@ -182,9 +201,11 @@ public sealed class ReferenceWalker
             }
 
             // Only track methods, properties, and fields
-            if (symbol.Kind == SymbolKind.Method ||
-                symbol.Kind == SymbolKind.Property ||
-                symbol.Kind == SymbolKind.Field)
+            if (
+                symbol.Kind == SymbolKind.Method
+                || symbol.Kind == SymbolKind.Property
+                || symbol.Kind == SymbolKind.Field
+            )
             {
                 _references.Add(symbol);
             }

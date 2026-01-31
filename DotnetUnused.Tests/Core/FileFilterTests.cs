@@ -154,4 +154,3 @@ public class FileFilterTests
         Assert.False(FileFilter.ShouldAnalyze(filePath));
     }
 }
-

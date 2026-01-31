@@ -62,11 +62,7 @@ public class AnalysisResultTests
     public void TotalReferencesFound_CanExceedTotalSymbolsAnalyzed()
     {
         // Arrange - can have more references than symbols (multiple refs to same symbol)
-        var result = new AnalysisResult
-        {
-            TotalSymbolsAnalyzed = 50,
-            TotalReferencesFound = 500
-        };
+        var result = new AnalysisResult { TotalSymbolsAnalyzed = 50, TotalReferencesFound = 500 };
 
         // Assert
         Assert.Equal(50, result.TotalSymbolsAnalyzed);

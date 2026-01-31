@@ -156,7 +156,10 @@ public class FileFilterEdgeCasesTests
     [InlineData("C:\\MyProject\\MigrationsHelper.cs", true)]
     [InlineData("C:\\MyProject\\src\\20231226_Document.cs", true)]
     [InlineData("C:\\MyProject\\DataMigrations\\Script.cs", true)]
-    public void ShouldAnalyze_OnlyExcludesEFMigrationsNotSimilarNames(string filePath, bool expected)
+    public void ShouldAnalyze_OnlyExcludesEFMigrationsNotSimilarNames(
+        string filePath,
+        bool expected
+    )
     {
         Assert.Equal(expected, FileFilter.ShouldAnalyze(filePath));
     }

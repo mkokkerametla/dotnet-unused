@@ -5,6 +5,7 @@
 ## [1.0.0] - 2025-12-29
 
 ### Added
+
 - Unused using directives detection (enabled by default)
 - `dotnet-unused.skipUsings` configuration option to disable (default: false)
 - Inline diagnostics for unused using statements with hint severity
@@ -15,15 +16,18 @@
 ## [0.1.1] - 2025-12-28
 
 ### Fixed
+
 - Command injection vulnerability in terminal mode (use ShellExecution with proper argument arrays)
 - Temp file cleanup in all error paths with finally blocks
 - Missing icon reference in sidebar (use built-in VS Code search icon)
 
 ### Changed
+
 - Enhanced configuration description for useTerminal setting
 - Improved security with proper argument escaping
 
 ### Added
+
 - Automated release workflow via GitHub Actions
 - Automatic version synchronization with CLI tool using GitVersion
 - PUBLISHING.md documentation
@@ -31,6 +35,7 @@
 ## [0.1.0] - 2024-12-26
 
 ### Added
+
 - Initial release of Dotnet Unused Code Analyzer extension
 - On-demand analysis for workspace and current file
 - Inline diagnostics with configurable severity
