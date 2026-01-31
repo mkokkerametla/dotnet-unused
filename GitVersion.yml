@@ -3,7 +3,7 @@ branches:
   master:
     regex: ^master$
     mode: ContinuousDeployment
-    tag: ''
+    tag: ""
     increment: Patch
     prevent-increment-of-merged-branch-version: true
     track-merge-target: false
@@ -14,19 +14,19 @@ branches:
     mode: ContinuousDeployment
     tag: alpha
     increment: Patch
-    source-branches: ['master', 'main']
+    source-branches: ["master", "main"]
   fix:
     regex: ^fix[/-]
     mode: ContinuousDeployment
     tag: beta
     increment: Patch
-    source-branches: ['master', 'main']
+    source-branches: ["master", "main"]
   pull-request:
     regex: ^(pull|pull\-requests|pr)[/-]
     mode: ContinuousDeployment
     tag: pr
     increment: Patch
-    source-branches: ['master', 'main']
+    source-branches: ["master", "main"]
 ignore:
   sha: []
 merge-message-formats: {}

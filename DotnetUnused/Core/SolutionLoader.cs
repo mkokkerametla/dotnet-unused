@@ -19,9 +19,7 @@ public sealed class SolutionLoader
             var instances = MSBuildLocator.QueryVisualStudioInstances().ToList();
 
             // Prefer the latest .NET SDK
-            var instance = instances
-                .OrderByDescending(i => i.Version)
-                .FirstOrDefault();
+            var instance = instances.OrderByDescending(i => i.Version).FirstOrDefault();
 
             if (instance != null)
             {
@@ -40,7 +38,11 @@ public sealed class SolutionLoader
     /// <summary>
     /// Loads a solution or project file
     /// </summary>
-    public async Task<Solution> LoadAsync(string path, IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<Solution> LoadAsync(
+        string path,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default
+    )
     {
         EnsureMSBuildRegistered();
 
@@ -90,5 +92,6 @@ public sealed class SolutionLoader
     /// <summary>
     /// Filters out generated files that should be excluded from analysis
     /// </summary>
-    public static bool ShouldAnalyzeDocument(Document document) => FileFilter.ShouldAnalyze(document.FilePath);
+    public static bool ShouldAnalyzeDocument(Document document) =>
+        FileFilter.ShouldAnalyze(document.FilePath);
 }

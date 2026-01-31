@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.0] - 2025-12-31
 
 ### Added
+
 - **CS8019 compiler diagnostic fallback** when IDE analyzers are not loaded
 - **Constructed generic type handling** in reference walker (e.g., `List<int>.Add` correctly maps to `List<T>.Add`)
 - **VS Code Extension: One-click CLI installation** with automated setup
@@ -22,12 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests for constructed generic type handling
 
 ### Changed
+
 - **VS Code Extension: Improved CLI detection** - finds CLI even when not in PowerShell PATH
 - **VS Code Extension: Better installation flow** - verifies file exists before reporting success
 - Regex performance optimization using `[GeneratedRegex]` attribute (10x faster)
 - Refactored VS Code extension: extracted `selectProjectOrSolution()` helper (reduced 70 lines duplication)
 
 ### Fixed
+
 - **SECURITY: Command injection vulnerability** in VS Code extension (removed unsafe `shell: true`)
 - **CRITICAL: Atomic file writes** in UsingDirectiveFixer (prevents corruption on failure/cancellation)
 - **CRITICAL: Path filtering false positives** using precise NuGet/SDK folder checks
@@ -38,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Package ID case-sensitivity: `dotnetunused` (lowercase)
 
 ### Security
+
 - Removed `shell: true` from all VS Code extension spawn calls
 - Conditional shell usage: only for non-absolute paths
 - Prevents malicious config from executing arbitrary commands
@@ -45,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2025-12-29
 
 ### Added
+
 - **Unused using directives detection** (enabled by default using CS8019/IDE0005 diagnostics)
 - Identifies unnecessary namespace imports in all C# files
 - Support for global usings analysis (.NET 6+ implicit usings)
@@ -60,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Microsoft.CodeAnalysis.Features 5.0.0 dependency for Roslyn analyzer support
 
 ### Changed
+
 - **Extended default analysis** to include using directive validation (can be disabled with --skip-usings)
 - Updated report format to include "Unused Using Directives" section
 - Console output now shows both unused symbols and unused usings by default
@@ -67,12 +73,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FileFilter now excludes Migrations folder for EF Core auto-generated files
 
 ### Deprecated
+
 - **JSON API**: `Summary.UnusedCount` field is deprecated in favor of `Summary.UnusedSymbolsCount` for clarity
   - Both fields are currently present for backward compatibility
   - `UnusedCount` will be removed in v2.0.0
   - Consumers should migrate to `UnusedSymbolsCount` which more accurately describes the counted items
 
 ### Fixed
+
 - File formatting preservation when using --fix (no more unwanted reformatting)
 - Batch removal of all unused usings in one operation (prevents line number conflicts)
 - Smart migration detection (excludes EF migrations, allows user files in Migrations folder)
@@ -80,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2025-12-28
 
 ### Added
+
 - GitVersion integration for automatic semantic versioning
 - Unit test infrastructure with xUnit (85 passing tests)
 - FileFilter utility class for shared file filtering logic
@@ -92,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test project documentation (DotnetUnused.Tests/README.md)
 
 ### Changed
+
 - Improved CLI argument parsing with bool.TryParse
 - Refactored SymbolIndexer, ReferenceWalker, and SolutionLoader to use FileFilter
 - Enhanced GitHub Actions workflow with GitVersion
@@ -99,6 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Synchronized versions between CLI tool and VS Code extension
 
 ### Fixed
+
 - Command injection vulnerability in VS Code extension terminal mode
 - Temp file cleanup in VS Code extension error paths
 - Missing icon reference in VS Code extension
@@ -106,12 +117,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bool.Parse crash on invalid --exclude-public values
 
 ### Security
+
 - Fixed command injection in VS Code extension (replaced string interpolation with ShellExecution)
 - Added proper argument escaping for CLI execution
 
 ## [1.0.0] - 2025-12-26
 
 ### Added
+
 - Initial release of DotnetUnused CLI tool
 - Unused method detection
 - Unused property detection
@@ -135,11 +148,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Partial class support
 
 ### Performance
+
 - Analyzes medium-sized solutions (<500k LOC) in under 10 seconds
 - Single compilation per project
 - Concurrent symbol indexing
 
 ### Compatibility
+
 - Works with SDK-style projects
 - Works with legacy .csproj format
 - Requires Visual Studio MSBuild for .NET Framework projects

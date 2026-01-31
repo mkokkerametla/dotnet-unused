@@ -12,7 +12,8 @@ public class UnusedUsingAnalyzerTests
     public async Task AnalyzeAsync_UsesCS8019Fallback_WhenNoIDEAnalyzersAvailable()
     {
         // Arrange - Create an in-memory project (won't have IDE analyzers, but has compiler)
-        var sourceCode = @"
+        var sourceCode =
+            @"
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -44,7 +45,8 @@ namespace TestProject
     public async Task AnalyzeAsync_ReturnsNonNull_WithValidSolution()
     {
         // Arrange - Create code where all usings are used
-        var sourceCode = @"
+        var sourceCode =
+            @"
 using System;
 using System.Collections.Generic;
 
@@ -73,7 +75,8 @@ namespace TestProject
     public async Task AnalyzeAsync_HandlesCancellation()
     {
         // Arrange
-        var sourceCode = @"using System;
+        var sourceCode =
+            @"using System;
 namespace TestProject { public class TestClass { } }";
         var solution = CreateTestSolution("TestProject", "TestClass.cs", sourceCode);
         var analyzer = new UnusedUsingAnalyzer();
@@ -82,7 +85,8 @@ namespace TestProject { public class TestClass { } }";
 
         // Act & Assert
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            async () => await analyzer.AnalyzeAsync(solution, cancellationToken: cts.Token));
+            async () => await analyzer.AnalyzeAsync(solution, cancellationToken: cts.Token)
+        );
     }
 
     [Fact(Skip = "Requires MSBuildWorkspace for full analyzer support - use for manual testing")]
@@ -116,18 +120,35 @@ namespace TestProject { public class TestClass { } }";
     /// <summary>
     /// Creates a simple in-memory solution for testing
     /// </summary>
-    private static Solution CreateTestSolution(string projectName, string fileName, string sourceCode)
+    private static Solution CreateTestSolution(
+        string projectName,
+        string fileName,
+        string sourceCode
+    )
     {
         var projectId = ProjectId.CreateNewId();
         var documentId = DocumentId.CreateNewId(projectId);
 
         var solution = new AdhocWorkspace()
-            .CurrentSolution
-            .AddProject(projectId, projectName, projectName, LanguageNames.CSharp)
-            .AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
-            .AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(Console).Assembly.Location))
-            .AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(System.Collections.Generic.List<>).Assembly.Location))
-            .AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(System.Linq.Enumerable).Assembly.Location))
+            .CurrentSolution.AddProject(projectId, projectName, projectName, LanguageNames.CSharp)
+            .AddMetadataReference(
+                projectId,
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location)
+            )
+            .AddMetadataReference(
+                projectId,
+                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location)
+            )
+            .AddMetadataReference(
+                projectId,
+                MetadataReference.CreateFromFile(
+                    typeof(System.Collections.Generic.List<>).Assembly.Location
+                )
+            )
+            .AddMetadataReference(
+                projectId,
+                MetadataReference.CreateFromFile(typeof(System.Linq.Enumerable).Assembly.Location)
+            )
             .AddDocument(documentId, fileName, SourceText.From(sourceCode));
 
         return solution;

@@ -29,7 +29,12 @@ public class UsingDirectiveFixerTests
         var solution = CreateEmptySolution();
         var unusedUsings = new List<UsingDirectiveInfo>
         {
-            new() { FilePath = "test.cs", LineNumber = 1, Namespace = "System.Linq" }
+            new()
+            {
+                FilePath = "test.cs",
+                LineNumber = 1,
+                Namespace = "System.Linq"
+            }
         };
 
         // Act - File doesn't exist in solution, so nothing should be fixed

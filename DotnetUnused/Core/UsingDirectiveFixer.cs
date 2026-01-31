@@ -1,7 +1,7 @@
+using DotnetUnused.Models;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using DotnetUnused.Models;
 
 namespace DotnetUnused.Core;
 
@@ -17,7 +17,8 @@ public sealed class UsingDirectiveFixer
         Solution solution,
         List<UsingDirectiveInfo> unusedUsings,
         IProgress<string>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         if (unusedUsings.Count == 0)
         {
@@ -45,7 +46,9 @@ public sealed class UsingDirectiveFixer
                 var document = FindDocument(solution, filePath);
                 if (document == null)
                 {
-                    progress?.Report($"Warning: Could not find document for {Path.GetFileName(filePath)}");
+                    progress?.Report(
+                        $"Warning: Could not find document for {Path.GetFileName(filePath)}"
+                    );
                     continue;
                 }
 
@@ -78,7 +81,9 @@ public sealed class UsingDirectiveFixer
 
                 if (!allUsingNodes.Any())
                 {
-                    progress?.Report($"Warning: Could not find using nodes to remove in {Path.GetFileName(filePath)}");
+                    progress?.Report(
+                        $"Warning: Could not find using nodes to remove in {Path.GetFileName(filePath)}"
+                    );
                     continue;
                 }
 
@@ -87,7 +92,9 @@ public sealed class UsingDirectiveFixer
 
                 if (newRoot == null)
                 {
-                    progress?.Report($"Warning: Failed to remove usings from {Path.GetFileName(filePath)}");
+                    progress?.Report(
+                        $"Warning: Failed to remove usings from {Path.GetFileName(filePath)}"
+                    );
                     continue;
                 }
 
@@ -98,7 +105,9 @@ public sealed class UsingDirectiveFixer
                 filesModified++;
                 usingsRemoved += usingsToRemove.Count;
 
-                progress?.Report($"Fixed {Path.GetFileName(filePath)}: removed {usingsToRemove.Count} unused usings");
+                progress?.Report(
+                    $"Fixed {Path.GetFileName(filePath)}: removed {usingsToRemove.Count} unused usings"
+                );
             }
             catch (Exception ex)
             {
@@ -118,8 +127,11 @@ public sealed class UsingDirectiveFixer
         {
             foreach (var document in project.Documents)
             {
-                if (document.FilePath != null &&
-                    Path.GetFullPath(document.FilePath).Equals(normalizedPath, StringComparison.OrdinalIgnoreCase))
+                if (
+                    document.FilePath != null
+                    && Path.GetFullPath(document.FilePath)
+                        .Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
+                )
                 {
                     return document;
                 }
@@ -133,14 +145,21 @@ public sealed class UsingDirectiveFixer
     /// Writes content to a file atomically using temp file + rename pattern
     /// This prevents file corruption if write fails or is cancelled
     /// </summary>
-    private static async Task WriteFileAtomicallyAsync(string filePath, string content, CancellationToken cancellationToken)
+    private static async Task WriteFileAtomicallyAsync(
+        string filePath,
+        string content,
+        CancellationToken cancellationToken
+    )
     {
         string? tempFile = null;
         try
         {
             // Create temp file in same directory to ensure same volume (required for atomic move)
             var directory = Path.GetDirectoryName(filePath) ?? Directory.GetCurrentDirectory();
-            tempFile = Path.Combine(directory, $".{Path.GetFileName(filePath)}.{Guid.NewGuid()}.tmp");
+            tempFile = Path.Combine(
+                directory,
+                $".{Path.GetFileName(filePath)}.{Guid.NewGuid()}.tmp"
+            );
 
             // Write to temp file
             await File.WriteAllTextAsync(tempFile, content, cancellationToken);

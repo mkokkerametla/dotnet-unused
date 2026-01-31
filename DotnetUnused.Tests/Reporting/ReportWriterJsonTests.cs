@@ -1,6 +1,6 @@
+using System.Text.Json;
 using DotnetUnused.Models;
 using DotnetUnused.Reporting;
-using System.Text.Json;
 using Xunit;
 
 namespace DotnetUnused.Tests.Reporting;
@@ -11,11 +11,7 @@ public class ReportWriterJsonTests
     public async Task WriteJsonReportAsync_IncludesBothUnusedCountFields_ForBackwardCompatibility()
     {
         // Arrange - Use empty result to avoid needing mock ISymbol instances
-        var result = new AnalysisResult
-        {
-            TotalSymbolsAnalyzed = 100,
-            TotalReferencesFound = 80
-        };
+        var result = new AnalysisResult { TotalSymbolsAnalyzed = 100, TotalReferencesFound = 80 };
 
         var writer = new ReportWriter();
         var tempFile = Path.GetTempFileName();
@@ -51,13 +47,15 @@ public class ReportWriterJsonTests
     {
         // Arrange
         var result = new AnalysisResult();
-        result.AddUnusedUsing(new UsingDirectiveInfo
-        {
-            FilePath = "test.cs",
-            LineNumber = 1,
-            Namespace = "System.Linq",
-            Message = "Unused"
-        });
+        result.AddUnusedUsing(
+            new UsingDirectiveInfo
+            {
+                FilePath = "test.cs",
+                LineNumber = 1,
+                Namespace = "System.Linq",
+                Message = "Unused"
+            }
+        );
 
         var writer = new ReportWriter();
         var tempFile = Path.GetTempFileName();

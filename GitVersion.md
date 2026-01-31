@@ -5,6 +5,7 @@ This project uses [GitVersion](https://gitversion.net/) for automatic semantic v
 ## How It Works
 
 GitVersion automatically calculates the next version number based on:
+
 - Git tags
 - Branch names
 - Commit messages (with conventional commits)
@@ -15,6 +16,7 @@ GitVersion automatically calculates the next version number based on:
 **Mode**: ContinuousDeployment
 
 **Branches**:
+
 - `master`/`main`: Release branches (e.g., 1.0.0, 1.0.1)
 - `feature/*`: Alpha versions (e.g., 1.0.1-alpha.1)
 - `fix/*`: Beta versions (e.g., 1.0.1-beta.1)
@@ -57,6 +59,7 @@ dotnet-gitversion
 ## CI/CD Integration
 
 The GitHub Actions workflow automatically:
+
 1. Installs GitVersion
 2. Calculates version from git history
 3. Uses version for:

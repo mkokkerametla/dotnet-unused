@@ -33,29 +33,43 @@ public static partial class FileFilter
         }
 
         // Exclude bin/obj directories (all positions: start, middle, end)
-        if (filePath.Contains("\\bin\\") || filePath.Contains("\\obj\\") ||
-            filePath.Contains("/bin/") || filePath.Contains("/obj/") ||
-            filePath.StartsWith("bin\\") || filePath.StartsWith("obj\\") ||
-            filePath.StartsWith("bin/") || filePath.StartsWith("obj/") ||
-            filePath.EndsWith("\\bin") || filePath.EndsWith("\\obj") ||
-            filePath.EndsWith("/bin") || filePath.EndsWith("/obj"))
+        if (
+            filePath.Contains("\\bin\\")
+            || filePath.Contains("\\obj\\")
+            || filePath.Contains("/bin/")
+            || filePath.Contains("/obj/")
+            || filePath.StartsWith("bin\\")
+            || filePath.StartsWith("obj\\")
+            || filePath.StartsWith("bin/")
+            || filePath.StartsWith("obj/")
+            || filePath.EndsWith("\\bin")
+            || filePath.EndsWith("\\obj")
+            || filePath.EndsWith("/bin")
+            || filePath.EndsWith("/obj")
+        )
         {
             return false;
         }
 
         // Exclude EF Core migrations (auto-generated, typically have timestamp patterns)
         // But allow user files in Migrations folder that don't match migration patterns
-        if ((filePath.Contains("\\Migrations\\") || filePath.Contains("/Migrations/")) &&
-            (filePath.Contains("ModelSnapshot.cs") ||
-             MigrationTimestampPattern().IsMatch(filePath))) // Timestamp pattern like 20231226120000_
+        if (
+            (filePath.Contains("\\Migrations\\") || filePath.Contains("/Migrations/"))
+            && (
+                filePath.Contains("ModelSnapshot.cs")
+                || MigrationTimestampPattern().IsMatch(filePath)
+            )
+        ) // Timestamp pattern like 20231226120000_
         {
             return false;
         }
 
         // Exclude generated files
-        if (filePath.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase) ||
-            filePath.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase) ||
-            filePath.EndsWith(".g.i.cs", StringComparison.OrdinalIgnoreCase))
+        if (
+            filePath.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase)
+            || filePath.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase)
+            || filePath.EndsWith(".g.i.cs", StringComparison.OrdinalIgnoreCase)
+        )
         {
             return false;
         }

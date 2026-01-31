@@ -16,7 +16,8 @@ public class UnusedUsingAnalyzerFallbackTests
     public async Task AnalyzeAsync_FallsBackToCS8019_WhenNoIDEAnalyzers()
     {
         // Arrange - Create solution without IDE analyzers (AdhocWorkspace)
-        var sourceCode = @"
+        var sourceCode =
+            @"
 using System;
 using System.Linq;
 
@@ -51,16 +52,25 @@ namespace TestProject
         await Task.CompletedTask;
     }
 
-    private static Solution CreateTestSolution(string projectName, string fileName, string sourceCode)
+    private static Solution CreateTestSolution(
+        string projectName,
+        string fileName,
+        string sourceCode
+    )
     {
         var projectId = ProjectId.CreateNewId();
         var documentId = DocumentId.CreateNewId(projectId);
 
         var solution = new AdhocWorkspace()
-            .CurrentSolution
-            .AddProject(projectId, projectName, projectName, LanguageNames.CSharp)
-            .AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
-            .AddMetadataReference(projectId, MetadataReference.CreateFromFile(typeof(Console).Assembly.Location))
+            .CurrentSolution.AddProject(projectId, projectName, projectName, LanguageNames.CSharp)
+            .AddMetadataReference(
+                projectId,
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location)
+            )
+            .AddMetadataReference(
+                projectId,
+                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location)
+            )
             .AddDocument(documentId, fileName, SourceText.From(sourceCode));
 
         return solution;
