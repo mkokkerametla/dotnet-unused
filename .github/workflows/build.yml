@@ -2,9 +2,9 @@ name: Build and Test
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
   pull_request:
-    branches: [ master, main ]
+    branches: [master, main]
 
 jobs:
   build-cli:
@@ -12,110 +12,110 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Required for GitVersion
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for GitVersion
 
-    - name: Install GitVersion
-      uses: gittools/actions/gitversion/setup@v1.1.1
-      with:
-        versionSpec: '5.x'
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v1.1.1
+        with:
+          versionSpec: "5.x"
 
-    - name: Determine Version
-      id: gitversion
-      uses: gittools/actions/gitversion/execute@v1.1.1
-      with:
-        useConfigFile: true
+      - name: Determine Version
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v1.1.1
+        with:
+          useConfigFile: true
 
-    - name: Display Version
-      run: |
-        echo "Version: ${{ steps.gitversion.outputs.semVer }}"
-        echo "NuGetVersion: ${{ steps.gitversion.outputs.nuGetVersion }}"
+      - name: Display Version
+        run: |
+          echo "Version: ${{ steps.gitversion.outputs.semVer }}"
+          echo "NuGetVersion: ${{ steps.gitversion.outputs.nuGetVersion }}"
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
 
-    - name: Restore dependencies
-      run: dotnet restore DotnetUnused/DotnetUnused.csproj
+      - name: Restore dependencies
+        run: dotnet restore DotnetUnused/DotnetUnused.csproj
 
-    - name: Build CLI
-      run: dotnet build DotnetUnused/DotnetUnused.csproj -c Release --no-restore
+      - name: Build CLI
+        run: dotnet build DotnetUnused/DotnetUnused.csproj -c Release --no-restore
 
-    - name: Build Tests
-      run: dotnet build DotnetUnused.Tests/DotnetUnused.Tests.csproj -c Release
+      - name: Build Tests
+        run: dotnet build DotnetUnused.Tests/DotnetUnused.Tests.csproj -c Release
 
-    - name: Run Unit Tests
-      run: dotnet test DotnetUnused.Tests/DotnetUnused.Tests.csproj -c Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+      - name: Run Unit Tests
+        run: dotnet test DotnetUnused.Tests/DotnetUnused.Tests.csproj -c Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
 
-    - name: Publish Test Results
-      uses: dorny/test-reporter@v1
-      if: success() || failure()
-      with:
-        name: CLI Unit Test Results
-        path: 'TestResults/*.trx'
-        reporter: dotnet-trx
-        fail-on-error: true
+      - name: Publish Test Results
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: CLI Unit Test Results
+          path: "TestResults/*.trx"
+          reporter: dotnet-trx
+          fail-on-error: true
 
-    - name: Upload Test Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-cli
-        path: 'TestResults/*.trx'
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-cli
+          path: "TestResults/*.trx"
 
   build-vscode-extension:
     name: Build VS Code Extension
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Required for GitVersion
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for GitVersion
 
-    - name: Install GitVersion
-      uses: gittools/actions/gitversion/setup@v1.1.1
-      with:
-        versionSpec: '5.x'
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v1.1.1
+        with:
+          versionSpec: "5.x"
 
-    - name: Determine Version
-      id: gitversion
-      uses: gittools/actions/gitversion/execute@v1.1.1
-      with:
-        useConfigFile: true
+      - name: Determine Version
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v1.1.1
+        with:
+          useConfigFile: true
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: vscode-extension/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: vscode-extension/package-lock.json
 
-    - name: Install dependencies
-      working-directory: ./vscode-extension
-      run: npm ci
+      - name: Install dependencies
+        working-directory: ./vscode-extension
+        run: npm ci
 
-    - name: Lint TypeScript
-      working-directory: ./vscode-extension
-      run: npm run lint
-      continue-on-error: true
+      - name: Lint TypeScript
+        working-directory: ./vscode-extension
+        run: npm run lint
+        continue-on-error: true
 
-    - name: Compile TypeScript
-      working-directory: ./vscode-extension
-      run: npm run compile
+      - name: Compile TypeScript
+        working-directory: ./vscode-extension
+        run: npm run compile
 
-    - name: Package Extension
-      id: package
-      working-directory: ./vscode-extension
-      run: npx @vscode/vsce package --out test-build.vsix
+      - name: Package Extension
+        id: package
+        working-directory: ./vscode-extension
+        run: npx @vscode/vsce package --out test-build.vsix
 
-    - name: Upload VSIX
-      uses: actions/upload-artifact@v4
-      if: steps.package.outcome == 'success'
-      with:
-        name: vscode-extension-build
-        path: vscode-extension/test-build.vsix
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        if: steps.package.outcome == 'success'
+        with:
+          name: vscode-extension-build
+          path: vscode-extension/test-build.vsix
 
   integration-check:
     name: Integration Check
@@ -124,8 +124,8 @@ jobs:
     if: success()
 
     steps:
-    - name: All builds successful
-      run: |
-        echo "✅ CLI build and tests passed"
-        echo "✅ VS Code extension build passed"
-        echo "✅ All checks completed successfully"
+      - name: All builds successful
+        run: |
+          echo "✅ CLI build and tests passed"
+          echo "✅ VS Code extension build passed"
+          echo "✅ All checks completed successfully"
