@@ -5,6 +5,7 @@ using Xunit;
 
 namespace DotnetUnused.Tests.Reporting;
 
+[Collection("Console")]
 public class ReportWriterJsonTests
 {
     [Fact(Skip = "Integration test - requires full solution analysis setup")]
@@ -78,6 +79,36 @@ public class ReportWriterJsonTests
             if (File.Exists(tempFile))
             {
                 File.Delete(tempFile);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task WriteJsonReportAsync_WithBracketedOutputPath_WritesFile()
+    {
+        var result = new AnalysisResult();
+        var writer = new ReportWriter();
+        var tempDir = Path.Combine(Path.GetTempPath(), $"dotnet-unused[{Guid.NewGuid():N}]");
+        var tempFile = Path.Combine(tempDir, "report[1].json");
+
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            await writer.WriteJsonReportAsync(result, tempFile);
+
+            Assert.True(File.Exists(tempFile));
+
+            var json = await File.ReadAllTextAsync(tempFile);
+            var doc = JsonDocument.Parse(json);
+
+            Assert.True(doc.RootElement.TryGetProperty("summary", out _));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
             }
         }
     }

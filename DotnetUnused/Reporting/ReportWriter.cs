@@ -77,7 +77,7 @@ public sealed class ReportWriter
             {
                 var name = symbol.FullyQualifiedName;
                 var location = $"{symbol.FilePath}:{symbol.LineNumber}";
-                table.AddRow(name, location);
+                table.AddRow(Markup.Escape(name), Markup.Escape(location));
             }
 
             AnsiConsole.Write(table);
@@ -111,9 +111,9 @@ public sealed class ReportWriter
                 foreach (var unusedUsing in fileGroup.OrderBy(u => u.LineNumber))
                 {
                     usingTable.AddRow(
-                        isFirst ? fileName : "",
+                        isFirst ? Markup.Escape(fileName) : "",
                         unusedUsing.LineNumber.ToString(),
-                        $"[dim]{unusedUsing.Namespace}[/]"
+                        $"[dim]{Markup.Escape(unusedUsing.Namespace)}[/]"
                     );
                     isFirst = false;
                 }
@@ -145,7 +145,11 @@ public sealed class ReportWriter
                     .ThenBy(p => p.PackageId)
             )
             {
-                packageTable.AddRow(pkg.ProjectName, pkg.PackageId, pkg.Version);
+                packageTable.AddRow(
+                    Markup.Escape(pkg.ProjectName),
+                    Markup.Escape(pkg.PackageId),
+                    Markup.Escape(pkg.Version)
+                );
             }
 
             AnsiConsole.Write(packageTable);
@@ -217,6 +221,6 @@ public sealed class ReportWriter
         var json = JsonSerializer.Serialize(jsonData, options);
         await File.WriteAllTextAsync(outputPath, json);
 
-        AnsiConsole.MarkupLine($"[green]JSON report written to: {outputPath}[/]");
+        AnsiConsole.MarkupLine($"[green]JSON report written to: {Markup.Escape(outputPath)}[/]");
     }
 }

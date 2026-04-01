@@ -4,21 +4,23 @@ using Xunit;
 
 namespace DotnetUnused.Tests.Cli;
 
+[Collection("Console")]
 public class ArgumentParsingTests
 {
-    [Fact(Skip = "Requires actual CLI execution - use for manual testing")]
+    [Fact]
     public async Task Main_WithNoArguments_ShowsHelp()
     {
-        // This would require running the actual CLI and capturing output
-        // For now, we rely on manual testing for CLI argument parsing
-        await Task.CompletedTask;
+        var exitCode = await DotnetUnused.Program.Main(Array.Empty<string>());
+
+        Assert.Equal(0, exitCode);
     }
 
-    [Fact(Skip = "Requires actual CLI execution - use for manual testing")]
+    [Fact]
     public async Task Main_WithHelpFlag_ShowsHelp()
     {
-        // Test --help and -h flags show help and exit successfully
-        await Task.CompletedTask;
+        var exitCode = await DotnetUnused.Program.Main(["--help"]);
+
+        Assert.Equal(0, exitCode);
     }
 
     [Fact(Skip = "Requires actual CLI execution - use for manual testing")]

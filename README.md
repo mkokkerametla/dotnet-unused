@@ -37,12 +37,16 @@ dotnet-unused MySolution.sln
 | `--skip-usings`     | Skip unused using directives analysis             |
 | `--fix`             | Automatically remove unused usings                |
 | `--unused-packages` | Detect unused NuGet packages                      |
+| `--help, -h`        | Show command help                                 |
 
 ### Examples
 
 ```bash
 # Basic analysis
 dotnet-unused MySolution.sln
+
+# Show CLI help
+dotnet-unused --help
 
 # Generate JSON report
 dotnet-unused MySolution.sln --format json --output report.json
