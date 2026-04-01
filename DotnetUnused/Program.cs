@@ -108,7 +108,7 @@ public class Program
         AnsiConsole.MarkupLine("[cyan]Detect unused code in .NET solutions[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Usage:[/]");
-        AnsiConsole.MarkupLine("  dotnet-unused [path] [options]");
+        AnsiConsole.MarkupLine("  dotnet-unused [[path]] [[options]]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Arguments:[/]");
         AnsiConsole.MarkupLine("  [cyan]path[/]               Path to .sln or .csproj file");
@@ -162,7 +162,7 @@ public class Program
         AnsiConsole.WriteLine();
 
         IProgress<string> progress = new Progress<string>(msg =>
-            AnsiConsole.MarkupLine($"[grey]{msg}[/]")
+            AnsiConsole.MarkupLine($"[grey]{Markup.Escape(msg)}[/]")
         );
 
         // Load solution
