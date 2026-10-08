@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-07
+
 ### Added
 
 - **`.slnx` solution support** - analyze the new XML-based solution format (#7)
