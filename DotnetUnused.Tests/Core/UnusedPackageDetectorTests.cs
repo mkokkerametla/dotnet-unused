@@ -91,6 +91,31 @@ public class UnusedPackageDetectorTests
     }
 
     [Fact]
+    public void DetectUnused_ExcludesPackagesWithoutCompileAssets()
+    {
+        // Arrange - a build-only package (e.g. DotNet.ReproducibleBuilds) exposes no namespace.
+        var packages = new List<PackageReferenceInfo>
+        {
+            new()
+            {
+                PackageId = "DotNet.ReproducibleBuilds",
+                Version = "1.1.1",
+                ProjectName = "Test",
+                ProjectPath = "Test.csproj",
+                IncludesCompileAssets = false
+            }
+        };
+
+        var foundNamespaces = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Act
+        var unused = _detector.DetectUnused(packages, foundNamespaces);
+
+        // Assert - packages that contribute no compile assets must never be flagged.
+        Assert.Empty(unused);
+    }
+
+    [Fact]
     public void DetectUnused_ExcludesAnalyzerPackages()
     {
         // Arrange
