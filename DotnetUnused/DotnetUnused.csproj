@@ -23,8 +23,8 @@
     <Description>High-performance CLI tool for detecting unused code in .NET solutions using Roslyn static analysis. Supports .NET Core, .NET 5+, and .NET Framework projects.</Description>
     <PackageTags>roslyn;static-analysis;unused-code;code-cleanup;refactoring;dotnet-tool</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/kokkerametla/dotnet-unused</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/kokkerametla/dotnet-unused</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/mkokkerametla/dotnet-unused</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mkokkerametla/dotnet-unused</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Initial release with support for detecting unused methods, properties, and fields.</PackageReleaseNotes>
