@@ -35,7 +35,9 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Restore dependencies
         run: dotnet restore DotnetUnused/DotnetUnused.csproj
@@ -51,7 +53,6 @@ jobs:
 
       - name: Publish to NuGet.org
         run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
-        continue-on-error: true
 
       - name: Upload NuGet package as artifact
         uses: actions/upload-artifact@v4
@@ -92,12 +93,14 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Publish standalone
         shell: bash
         run: |
-          dotnet publish DotnetUnused/DotnetUnused.csproj -c Release -r ${{ matrix.runtime }} --self-contained true -p:PublishSingleFile=true -p:Version=${{ steps.gitversion.outputs.nuGetVersion }} -o ./publish/${{ matrix.runtime }}
+          dotnet publish DotnetUnused/DotnetUnused.csproj -c Release --framework net10.0 -r ${{ matrix.runtime }} --self-contained true -p:PublishSingleFile=true -p:Version=${{ steps.gitversion.outputs.nuGetVersion }} -o ./publish/${{ matrix.runtime }}
 
       - name: Create archive (Windows)
         if: matrix.runtime == 'win-x64'
@@ -248,4 +251,3 @@ jobs:
         if: success() # Publish if build succeeded (works for both tag push and workflow_dispatch)
         working-directory: ./vscode-extension
         run: npx @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}
-        continue-on-error: true # Don't fail the workflow if marketplace publishing fails
