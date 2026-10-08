@@ -72,6 +72,14 @@ public sealed class UnusedPackageDetector
 
         foreach (var package in packages)
         {
+            // Skip packages that contribute no compile-time assets (build/analyzer/runtime only,
+            // e.g. DotNet.ReproducibleBuilds). They expose no namespace, so they can never be
+            // detected as "used" and would otherwise be false positives.
+            if (!package.IncludesCompileAssets)
+            {
+                continue;
+            }
+
             // Skip known build packages
             if (IsBuildOrToolingPackage(package.PackageId))
             {

@@ -33,6 +33,7 @@ public class Program
             var skipUsings = false;
             var fixUsings = false;
             var unusedPackages = false;
+            var ignoreAttributes = new List<string>();
 
             // Parse options
             for (int i = 1; i < args.Length; i++)
@@ -74,6 +75,19 @@ public class Program
                     case "--unused-packages":
                         unusedPackages = true;
                         break;
+                    case "--ignore-attributes":
+                        if (i + 1 < args.Length)
+                        {
+                            ignoreAttributes.AddRange(
+                                args[++i]
+                                    .Split(
+                                        ',',
+                                        StringSplitOptions.RemoveEmptyEntries
+                                            | StringSplitOptions.TrimEntries
+                                    )
+                            );
+                        }
+                        break;
                 }
             }
 
@@ -85,6 +99,7 @@ public class Program
                 skipUsings,
                 fixUsings,
                 unusedPackages,
+                ignoreAttributes,
                 cts.Token
             );
             return 0;
@@ -111,14 +126,16 @@ public class Program
         AnsiConsole.MarkupLine("  dotnet-unused [[path]] [[options]]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Arguments:[/]");
-        AnsiConsole.MarkupLine("  [cyan]path[/]               Path to .sln or .csproj file");
+        AnsiConsole.MarkupLine(
+            "  [cyan]path[/]               Path to .sln, .slnx, or .csproj file"
+        );
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Options:[/]");
         AnsiConsole.MarkupLine(
-            "  [cyan]--format, -f[/]       Output format: text or json (default: text)"
+            "  [cyan]--format, -f[/]       Output format: text, json, or markdown (default: text)"
         );
         AnsiConsole.MarkupLine(
-            "  [cyan]--output, -o[/]       Output file path (only for JSON format)"
+            "  [cyan]--output, -o[/]       Output file path (for JSON or markdown format)"
         );
         AnsiConsole.MarkupLine(
             "  [cyan]--exclude-public[/]   Exclude public members (default: true)"
@@ -132,6 +149,9 @@ public class Program
         AnsiConsole.MarkupLine(
             "  [cyan]--unused-packages[/]  Detect unused NuGet packages (default: false)"
         );
+        AnsiConsole.MarkupLine(
+            "  [cyan]--ignore-attributes[/]  Never flag members with these attributes (comma-separated)"
+        );
         AnsiConsole.MarkupLine("  [cyan]--help, -h[/]         Show help information");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Examples:[/]");
@@ -143,6 +163,12 @@ public class Program
         AnsiConsole.MarkupLine("  dotnet-unused MySolution.sln --skip-usings");
         AnsiConsole.MarkupLine("  dotnet-unused MySolution.sln --fix");
         AnsiConsole.MarkupLine("  dotnet-unused MySolution.sln --unused-packages");
+        AnsiConsole.MarkupLine(
+            "  dotnet-unused MySolution.slnx --format markdown --output report.md"
+        );
+        AnsiConsole.MarkupLine(
+            "  dotnet-unused MySolution.sln --ignore-attributes TestInitialize,SetUp"
+        );
     }
 
     private static async Task ScanAsync(
@@ -153,6 +179,7 @@ public class Program
         bool skipUsings,
         bool fixUsings,
         bool unusedPackages,
+        List<string> ignoreAttributes,
         CancellationToken cancellationToken = default
     )
     {
@@ -190,7 +217,7 @@ public class Program
 
         // Detect unused symbols
         cancellationToken.ThrowIfCancellationRequested();
-        var detector = new UnusedDetector(excludePublic);
+        var detector = new UnusedDetector(excludePublic, ignoreAttributes);
         var result = detector.DetectUnused(declaredSymbols, referencedSymbols, progress);
 
         // Analyze unused usings (default behavior unless --skip-usings)
@@ -254,14 +281,20 @@ public class Program
         // Output results
         var reporter = new ReportWriter();
 
-        if (format.ToLowerInvariant() == "json")
+        switch (format.ToLowerInvariant())
         {
-            var jsonPath = outputPath ?? "unused-code-report.json";
-            await reporter.WriteJsonReportAsync(result, jsonPath);
-        }
-        else
-        {
-            reporter.WriteConsoleReport(result);
+            case "json":
+                var jsonPath = outputPath ?? "unused-code-report.json";
+                await reporter.WriteJsonReportAsync(result, jsonPath);
+                break;
+            case "markdown"
+            or "md":
+                var mdPath = outputPath ?? "unused-code-report.md";
+                await reporter.WriteMarkdownReportAsync(result, mdPath);
+                break;
+            default:
+                reporter.WriteConsoleReport(result);
+                break;
         }
     }
 }

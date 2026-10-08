@@ -110,7 +110,8 @@ public sealed class PackageReferenceExtractor
                         PackageId = packageId,
                         Version = version,
                         ProjectPath = projectPath,
-                        ProjectName = projectName
+                        ProjectName = projectName,
+                        IncludesCompileAssets = DeterminesCompileAssets(packageRef)
                     }
                 );
             }
@@ -121,6 +122,67 @@ public sealed class PackageReferenceExtractor
         }
 
         return packages;
+    }
+
+    /// <summary>
+    /// Determines whether a package reference contributes compile-time assets.
+    /// A package that only supplies build/analyzer/runtime assets (via IncludeAssets that omits
+    /// "compile", or ExcludeAssets that includes "compile") exposes no API in code, so it has no
+    /// namespace to detect and must not be flagged as unused. PrivateAssets does not affect this,
+    /// since it only controls transitive flow, not the current project's compilation.
+    /// </summary>
+    private static bool DeterminesCompileAssets(XElement packageRef)
+    {
+        var includeAssets = GetMetadata(packageRef, "IncludeAssets");
+        var excludeAssets = GetMetadata(packageRef, "ExcludeAssets");
+
+        // IncludeAssets, when present, is an allow-list. Compile assets are present only when it
+        // contains "compile" or "all".
+        if (!string.IsNullOrWhiteSpace(includeAssets))
+        {
+            if (!ContainsAsset(includeAssets, "compile") && !ContainsAsset(includeAssets, "all"))
+            {
+                return false;
+            }
+        }
+
+        // ExcludeAssets removes assets. Excluding "compile" (or "all") drops compile-time assets.
+        if (ContainsAsset(excludeAssets, "compile") || ContainsAsset(excludeAssets, "all"))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Reads MSBuild item metadata that may be expressed either as an attribute or a child element.
+    /// </summary>
+    private static string? GetMetadata(XElement element, string name) =>
+        element.Attribute(name)?.Value
+        ?? element
+            .Elements()
+            .FirstOrDefault(e =>
+                string.Equals(e.Name.LocalName, name, StringComparison.OrdinalIgnoreCase)
+            )
+            ?.Value;
+
+    /// <summary>
+    /// Checks whether a semicolon-separated asset list contains a given token (case-insensitive).
+    /// </summary>
+    private static bool ContainsAsset(string? assets, string token)
+    {
+        if (string.IsNullOrWhiteSpace(assets))
+        {
+            return false;
+        }
+
+        return assets
+            .Split(
+                [';', ','],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+            .Any(a => string.Equals(a, token, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

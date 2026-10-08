@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using DotnetUnused.Models;
 using Spectre.Console;
@@ -223,4 +224,114 @@ public sealed class ReportWriter
 
         AnsiConsole.MarkupLine($"[green]JSON report written to: {Markup.Escape(outputPath)}[/]");
     }
+
+    /// <summary>
+    /// Writes results to a Markdown file
+    /// </summary>
+    public async Task WriteMarkdownReportAsync(AnalysisResult result, string outputPath)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine("# Unused Code Analysis Results");
+        sb.AppendLine();
+
+        // Summary
+        sb.AppendLine("## Summary");
+        sb.AppendLine();
+        sb.AppendLine("| Metric | Value |");
+        sb.AppendLine("| ------ | ----- |");
+        sb.AppendLine($"| Total Symbols Analyzed | {result.TotalSymbolsAnalyzed} |");
+        sb.AppendLine($"| Total References Found | {result.TotalReferencesFound} |");
+        sb.AppendLine($"| Unused Symbols | {result.UnusedSymbols.Count} |");
+        sb.AppendLine($"| Unused Usings | {result.UnusedUsings.Count} |");
+        if (result.TotalPackagesAnalyzed > 0)
+        {
+            sb.AppendLine($"| Packages Analyzed | {result.TotalPackagesAnalyzed} |");
+            sb.AppendLine($"| Unused Packages | {result.UnusedPackages.Count} |");
+        }
+        sb.AppendLine($"| Analysis Duration | {result.Duration.TotalSeconds:F2}s |");
+        sb.AppendLine();
+
+        if (
+            result.UnusedSymbols.Count == 0
+            && result.UnusedUsings.Count == 0
+            && result.UnusedPackages.Count == 0
+        )
+        {
+            sb.AppendLine("No unused code found!");
+            await File.WriteAllTextAsync(outputPath, sb.ToString());
+            AnsiConsole.MarkupLine(
+                $"[green]Markdown report written to: {Markup.Escape(outputPath)}[/]"
+            );
+            return;
+        }
+
+        // Unused symbols grouped by kind
+        var grouped = result.UnusedSymbols.GroupBy(s => s.Kind).OrderBy(g => g.Key.ToString());
+        foreach (var group in grouped)
+        {
+            sb.AppendLine($"## Unused {group.Key}s ({group.Count()})");
+            sb.AppendLine();
+            sb.AppendLine("| Name | Location |");
+            sb.AppendLine("| ---- | -------- |");
+            foreach (var symbol in group.OrderBy(s => s.FilePath).ThenBy(s => s.LineNumber))
+            {
+                var location = $"{symbol.FilePath}:{symbol.LineNumber}";
+                sb.AppendLine(
+                    $"| {EscapeMarkdown(symbol.FullyQualifiedName)} | {EscapeMarkdown(location)} |"
+                );
+            }
+            sb.AppendLine();
+        }
+
+        // Unused usings
+        if (result.UnusedUsings.Count > 0)
+        {
+            sb.AppendLine($"## Unused Using Directives ({result.UnusedUsings.Count})");
+            sb.AppendLine();
+            sb.AppendLine("| File | Line | Using Directive |");
+            sb.AppendLine("| ---- | ---- | --------------- |");
+            foreach (
+                var unusedUsing in result
+                    .UnusedUsings.OrderBy(u => u.FilePath)
+                    .ThenBy(u => u.LineNumber)
+            )
+            {
+                var fileName = Path.GetFileName(unusedUsing.FilePath);
+                sb.AppendLine(
+                    $"| {EscapeMarkdown(fileName)} | {unusedUsing.LineNumber} | {EscapeMarkdown(unusedUsing.Namespace)} |"
+                );
+            }
+            sb.AppendLine();
+        }
+
+        // Unused packages
+        if (result.UnusedPackages.Count > 0)
+        {
+            sb.AppendLine($"## Unused NuGet Packages ({result.UnusedPackages.Count})");
+            sb.AppendLine();
+            sb.AppendLine("| Project | Package | Version |");
+            sb.AppendLine("| ------- | ------- | ------- |");
+            foreach (
+                var pkg in result
+                    .UnusedPackages.OrderBy(p => p.ProjectName)
+                    .ThenBy(p => p.PackageId)
+            )
+            {
+                sb.AppendLine(
+                    $"| {EscapeMarkdown(pkg.ProjectName)} | {EscapeMarkdown(pkg.PackageId)} | {EscapeMarkdown(pkg.Version)} |"
+                );
+            }
+            sb.AppendLine();
+        }
+
+        await File.WriteAllTextAsync(outputPath, sb.ToString());
+        AnsiConsole.MarkupLine($"[green]Markdown report written to: {Markup.Escape(outputPath)}[/]");
+    }
+
+    /// <summary>
+    /// Escapes characters that would break Markdown table cells
+    /// </summary>
+    private static string EscapeMarkdown(string value) =>
+        value.Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
 }

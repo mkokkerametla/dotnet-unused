@@ -11,10 +11,32 @@ namespace DotnetUnused.Core;
 public sealed class UnusedDetector
 {
     private readonly bool _excludePublicApi;
+    private readonly HashSet<string> _ignoredAttributes;
 
-    public UnusedDetector(bool excludePublicApi = true)
+    public UnusedDetector(bool excludePublicApi = true, IEnumerable<string>? ignoreAttributes = null)
     {
         _excludePublicApi = excludePublicApi;
+        _ignoredAttributes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (ignoreAttributes != null)
+        {
+            foreach (var attr in ignoreAttributes)
+            {
+                if (string.IsNullOrWhiteSpace(attr))
+                {
+                    continue;
+                }
+
+                // Store both "TestInitialize" and "TestInitializeAttribute" so we match the Roslyn
+                // attribute class name whether or not it follows the "...Attribute" convention.
+                var name = attr.Trim();
+                _ignoredAttributes.Add(name);
+                if (!name.EndsWith("Attribute", StringComparison.OrdinalIgnoreCase))
+                {
+                    _ignoredAttributes.Add(name + "Attribute");
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -71,8 +93,14 @@ public sealed class UnusedDetector
             return false;
         }
 
-        // Test methods - never report as unused
+        // Test methods (including lifecycle hooks) - never report as unused
         if (IsTestMethod(symbol))
+        {
+            return false;
+        }
+
+        // User-specified ignored attributes (e.g. --ignore-attributes TestInitialize)
+        if (HasIgnoredAttribute(symbol))
         {
             return false;
         }
@@ -129,7 +157,9 @@ public sealed class UnusedDetector
             return false;
         }
 
-        // Check for common test framework attributes
+        // Check for common test framework attributes, including setup/teardown lifecycle hooks
+        // (MSTest TestInitialize/Cleanup, NUnit SetUp/TearDown, etc.) which are invoked by the
+        // test runner rather than by direct code references.
         var attributes = method.GetAttributes();
         foreach (var attr in attributes)
         {
@@ -141,7 +171,38 @@ public sealed class UnusedDetector
                     or "TestMethodAttribute"
                     or "TheoryAttribute"
                     or "TestCaseAttribute"
+                    // MSTest lifecycle
+                    or "TestInitializeAttribute"
+                    or "TestCleanupAttribute"
+                    or "ClassInitializeAttribute"
+                    or "ClassCleanupAttribute"
+                    or "AssemblyInitializeAttribute"
+                    or "AssemblyCleanupAttribute"
+                    // NUnit lifecycle
+                    or "SetUpAttribute"
+                    or "TearDownAttribute"
+                    or "OneTimeSetUpAttribute"
+                    or "OneTimeTearDownAttribute"
             )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool HasIgnoredAttribute(ISymbol symbol)
+    {
+        if (_ignoredAttributes.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var attr in symbol.GetAttributes())
+        {
+            var attrName = attr.AttributeClass?.Name;
+            if (attrName != null && _ignoredAttributes.Contains(attrName))
             {
                 return true;
             }

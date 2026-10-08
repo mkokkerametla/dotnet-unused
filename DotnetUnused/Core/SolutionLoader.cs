@@ -68,7 +68,10 @@ public sealed class SolutionLoader
 
         Solution solution;
 
-        if (path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
+        if (
+            path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
+            || path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase)
+        )
         {
             progress?.Report($"Loading solution: {path}");
             solution = await workspace.OpenSolutionAsync(path);
@@ -83,7 +86,9 @@ public sealed class SolutionLoader
         }
         else
         {
-            throw new ArgumentException($"Unsupported file type: {path}. Expected .sln or .csproj");
+            throw new ArgumentException(
+                $"Unsupported file type: {path}. Expected .sln, .slnx, or .csproj"
+            );
         }
 
         return solution;

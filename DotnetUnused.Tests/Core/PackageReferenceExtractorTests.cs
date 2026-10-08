@@ -156,6 +156,51 @@ public class PackageReferenceExtractorTests
     }
 
     [Fact]
+    public async Task ExtractFromProjectAsync_MarksBuildOnlyPackages_AsNoCompileAssets()
+    {
+        // Arrange
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var projectPath = Path.Combine(tempDir, "Test.csproj");
+            var projectContent = """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <ItemGroup>
+                    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                    <PackageReference Include="DotNet.ReproducibleBuilds" Version="1.1.1">
+                      <PrivateAssets>all</PrivateAssets>
+                      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+                    </PackageReference>
+                    <PackageReference Include="SomeTool" Version="1.0.0" ExcludeAssets="compile" />
+                  </ItemGroup>
+                </Project>
+                """;
+            await File.WriteAllTextAsync(projectPath, projectContent);
+
+            // Act
+            var packages = await _extractor.ExtractFromProjectAsync(projectPath, "Test");
+
+            // Assert
+            Assert.Equal(3, packages.Count);
+            Assert.True(
+                packages.Single(p => p.PackageId == "Newtonsoft.Json").IncludesCompileAssets
+            );
+            Assert.False(
+                packages
+                    .Single(p => p.PackageId == "DotNet.ReproducibleBuilds")
+                    .IncludesCompileAssets
+            );
+            Assert.False(packages.Single(p => p.PackageId == "SomeTool").IncludesCompileAssets);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public async Task ExtractFromProjectAsync_SetsProjectMetadata()
     {
         // Arrange

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`.slnx` solution support** - analyze the new XML-based solution format (#7)
+- **Markdown report output** via `--format markdown` (alias `md`), written to `--output` (#9)
+- **`--ignore-attributes` option** - comma-separated attribute names whose members are never flagged as unused, e.g. `--ignore-attributes TestInitialize,SetUp` (#8)
+- Built-in recognition of test lifecycle attributes (MSTest `TestInitialize`/`TestCleanup`/`ClassInitialize`/`ClassCleanup`/`AssemblyInitialize`/`AssemblyCleanup`, NUnit `SetUp`/`TearDown`/`OneTimeSetUp`/`OneTimeTearDown`) so these hooks are no longer reported as unused (#8)
+- **.NET 10 support** - the tool now multi-targets `net8.0` and `net10.0`, remaining backward compatible with the .NET 8 runtime
+
+### Changed
+
+- Unused-package detection now honors `IncludeAssets`/`ExcludeAssets` on `PackageReference`: packages that contribute no compile-time assets (e.g. `DotNet.ReproducibleBuilds`) are no longer reported as unused (#9)
+- README corrected to use the `DotnetUnused` package id and documents the `dotnet tool exec` usage (#9)
+
 ## [1.2.0] - 2025-12-31
 
 ### Added
