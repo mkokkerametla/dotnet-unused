@@ -54,6 +54,7 @@ Solutions (`.sln` and `.slnx`) and individual projects (`.csproj`) are all suppo
 | `--fix`               | Automatically remove unused usings                              |
 | `--unused-packages`   | Detect unused NuGet packages                                    |
 | `--ignore-attributes` | Comma-separated attribute names whose members are never flagged |
+| `--msbuild-path` | Directory of the MSBuild to use (e.g. a .NET SDK folder). Also settable via `DOTNET_UNUSED_MSBUILD_PATH` |
 | `--help, -h`          | Show command help                                               |
 
 ### Examples
