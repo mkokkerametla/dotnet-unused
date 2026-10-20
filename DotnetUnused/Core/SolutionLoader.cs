@@ -9,30 +9,91 @@ namespace DotnetUnused.Core;
 /// </summary>
 public sealed class SolutionLoader
 {
+    /// <summary>
+    /// Environment variable that overrides MSBuild discovery (same effect as --msbuild-path)
+    /// </summary>
+    public const string MSBuildPathEnvironmentVariable = "DOTNET_UNUSED_MSBUILD_PATH";
+
     private static bool _msbuildRegistered;
+    private static string? _registeredDescription;
 
-    public static void EnsureMSBuildRegistered()
+    private readonly string? _msbuildPath;
+
+    public SolutionLoader(string? msbuildPath = null)
     {
-        if (!_msbuildRegistered)
-        {
-            // Query for available MSBuild instances
-            var instances = MSBuildLocator.QueryVisualStudioInstances().ToList();
+        _msbuildPath = msbuildPath;
+    }
 
-            // Prefer the latest .NET SDK
-            var instance = instances.OrderByDescending(i => i.Version).FirstOrDefault();
+    /// <summary>
+    /// Picks the MSBuild instance to use. .NET SDK instances win over Visual Studio ones because
+    /// the tool runs on modern .NET and a newer Visual Studio MSBuild (.NET Framework) can be
+    /// incompatible with the bundled Roslyn BuildHost. Within a kind, the newest version wins.
+    /// </summary>
+    public static T? SelectInstance<T>(
+        IEnumerable<T> instances,
+        Func<T, bool> isDotNetSdk,
+        Func<T, Version> getVersion
+    )
+        where T : class
+    {
+        var all = instances.ToList();
+        var sdks = all.Where(isDotNetSdk).ToList();
+        var candidates = sdks.Count > 0 ? sdks : all;
+        return candidates.OrderByDescending(getVersion).FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Registers MSBuild once per process. An explicit path (argument or environment variable)
+    /// takes precedence over discovery. Returns a description of what was registered.
+    /// </summary>
+    public static string EnsureMSBuildRegistered(string? msbuildPath = null)
+    {
+        if (_msbuildRegistered)
+        {
+            return _registeredDescription!;
+        }
+
+        var overridePath = !string.IsNullOrWhiteSpace(msbuildPath)
+            ? msbuildPath
+            : Environment.GetEnvironmentVariable(MSBuildPathEnvironmentVariable);
+
+        if (!string.IsNullOrWhiteSpace(overridePath))
+        {
+            if (!Directory.Exists(overridePath))
+            {
+                throw new DirectoryNotFoundException(
+                    $"MSBuild path not found: {overridePath}. "
+                        + "It should be the directory containing MSBuild.dll, "
+                        + "e.g. /usr/share/dotnet/sdk/<version>"
+                );
+            }
+
+            MSBuildLocator.RegisterMSBuildPath(overridePath);
+            _registeredDescription = $"MSBuild from {overridePath} (user override)";
+        }
+        else
+        {
+            var instance = SelectInstance(
+                MSBuildLocator.QueryVisualStudioInstances(),
+                i => i.DiscoveryType == DiscoveryType.DotNetSdk,
+                i => i.Version
+            );
 
             if (instance != null)
             {
                 MSBuildLocator.RegisterInstance(instance);
+                _registeredDescription =
+                    $"MSBuild {instance.Version} ({instance.Name}) at {instance.MSBuildPath}";
             }
             else
             {
-                // Fallback to default
                 MSBuildLocator.RegisterDefaults();
+                _registeredDescription = "default MSBuild";
             }
-
-            _msbuildRegistered = true;
         }
+
+        _msbuildRegistered = true;
+        return _registeredDescription;
     }
 
     /// <summary>
@@ -44,7 +105,8 @@ public sealed class SolutionLoader
         CancellationToken cancellationToken = default
     )
     {
-        EnsureMSBuildRegistered();
+        var msbuild = EnsureMSBuildRegistered(_msbuildPath);
+        progress?.Report($"Using {msbuild}");
 
         if (!File.Exists(path))
         {
@@ -68,26 +130,40 @@ public sealed class SolutionLoader
 
         Solution solution;
 
-        if (
-            path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase)
-        )
+        try
         {
-            progress?.Report($"Loading solution: {path}");
-            solution = await workspace.OpenSolutionAsync(path);
-            progress?.Report($"Loaded solution with {solution.ProjectIds.Count} projects");
+            if (
+                path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                progress?.Report($"Loading solution: {path}");
+                solution = await workspace.OpenSolutionAsync(path);
+                progress?.Report($"Loaded solution with {solution.ProjectIds.Count} projects");
+            }
+            else if (path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            {
+                progress?.Report($"Loading project: {path}");
+                var project = await workspace.OpenProjectAsync(path);
+                solution = project.Solution;
+                progress?.Report($"Loaded project: {project.Name}");
+            }
+            else
+            {
+                throw new ArgumentException(
+                    $"Unsupported file type: {path}. Expected .sln, .slnx, or .csproj"
+                );
+            }
+
         }
-        else if (path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+        catch (Exception ex) when (ex is not (OperationCanceledException or ArgumentException))
         {
-            progress?.Report($"Loading project: {path}");
-            var project = await workspace.OpenProjectAsync(path);
-            solution = project.Solution;
-            progress?.Report($"Loaded project: {project.Name}");
-        }
-        else
-        {
-            throw new ArgumentException(
-                $"Unsupported file type: {path}. Expected .sln, .slnx, or .csproj"
+            throw new InvalidOperationException(
+                $"Failed to load '{path}' using {msbuild}. "
+                    + "If this is an MSBuild/BuildHost error, try selecting a different MSBuild "
+                    + "with --msbuild-path <dir> (e.g. a .NET SDK directory) or by setting "
+                    + $"{MSBuildPathEnvironmentVariable}. Original error: {ex.Message}",
+                ex
             );
         }
 

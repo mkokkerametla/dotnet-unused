@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--msbuild-path` option** (and `DOTNET_UNUSED_MSBUILD_PATH` environment variable) to choose which MSBuild is used when loading projects (#13)
+
+### Fixed
+
+- MSBuild discovery now prefers .NET SDK instances over Visual Studio ones, instead of picking the highest version number, which selected an incompatible Visual Studio MSBuild on some machines (#13)
+- Solution/project load failures now report the MSBuild in use and how to override it
+
 ## [1.3.0] - 2026-10-07
 
 ### Added

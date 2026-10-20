@@ -34,6 +34,7 @@ public class Program
             var fixUsings = false;
             var unusedPackages = false;
             var ignoreAttributes = new List<string>();
+            string? msbuildPath = null;
 
             // Parse options
             for (int i = 1; i < args.Length; i++)
@@ -75,6 +76,12 @@ public class Program
                     case "--unused-packages":
                         unusedPackages = true;
                         break;
+                    case "--msbuild-path":
+                        if (i + 1 < args.Length)
+                        {
+                            msbuildPath = args[++i];
+                        }
+                        break;
                     case "--ignore-attributes":
                         if (i + 1 < args.Length)
                         {
@@ -100,6 +107,7 @@ public class Program
                 fixUsings,
                 unusedPackages,
                 ignoreAttributes,
+                msbuildPath,
                 cts.Token
             );
             return 0;
@@ -152,6 +160,9 @@ public class Program
         AnsiConsole.MarkupLine(
             "  [cyan]--ignore-attributes[/]  Never flag members with these attributes (comma-separated)"
         );
+        AnsiConsole.MarkupLine(
+            "  [cyan]--msbuild-path[/]     Directory of the MSBuild to use, e.g. a .NET SDK folder (or set DOTNET_UNUSED_MSBUILD_PATH)"
+        );
         AnsiConsole.MarkupLine("  [cyan]--help, -h[/]         Show help information");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Examples:[/]");
@@ -180,6 +191,7 @@ public class Program
         bool fixUsings,
         bool unusedPackages,
         List<string> ignoreAttributes,
+        string? msbuildPath,
         CancellationToken cancellationToken = default
     )
     {
@@ -194,7 +206,7 @@ public class Program
 
         // Load solution
         cancellationToken.ThrowIfCancellationRequested();
-        var loader = new SolutionLoader();
+        var loader = new SolutionLoader(msbuildPath);
         var solution = await loader.LoadAsync(path, progress, cancellationToken);
 
         // Index declared symbols
