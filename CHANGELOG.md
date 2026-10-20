@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-20
+
 ### Added
 
 - **`--msbuild-path` option** (and `DOTNET_UNUSED_MSBUILD_PATH` environment variable) to choose which MSBuild is used when loading projects (#13)
