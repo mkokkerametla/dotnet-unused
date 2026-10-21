@@ -67,7 +67,11 @@ public class ReportWriterConsoleTests
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
         );
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var methodDeclaration = syntaxTree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var methodDeclaration = syntaxTree
+            .GetRoot()
+            .DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single();
         var symbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
 
         Assert.NotNull(symbol);

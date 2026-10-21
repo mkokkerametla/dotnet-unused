@@ -13,7 +13,10 @@ public sealed class UnusedDetector
     private readonly bool _excludePublicApi;
     private readonly HashSet<string> _ignoredAttributes;
 
-    public UnusedDetector(bool excludePublicApi = true, IEnumerable<string>? ignoreAttributes = null)
+    public UnusedDetector(
+        bool excludePublicApi = true,
+        IEnumerable<string>? ignoreAttributes = null
+    )
     {
         _excludePublicApi = excludePublicApi;
         _ignoredAttributes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

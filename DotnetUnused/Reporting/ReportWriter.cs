@@ -326,7 +326,9 @@ public sealed class ReportWriter
         }
 
         await File.WriteAllTextAsync(outputPath, sb.ToString());
-        AnsiConsole.MarkupLine($"[green]Markdown report written to: {Markup.Escape(outputPath)}[/]");
+        AnsiConsole.MarkupLine(
+            $"[green]Markdown report written to: {Markup.Escape(outputPath)}[/]"
+        );
     }
 
     /// <summary>
