@@ -144,18 +144,58 @@ public sealed class ReferenceWalker
             var symbol = symbolInfo.Symbol;
             if (symbol != null)
             {
-                AddReference(symbol);
+                AddReference(symbol, node);
             }
 
             // Also check candidate symbols (for overload resolution)
             foreach (var candidate in symbolInfo.CandidateSymbols)
             {
-                AddReference(candidate);
+                AddReference(candidate, node);
             }
         }
 
-        private void AddReference(ISymbol symbol)
+        /// <summary>
+        /// Records a reference to a type, unless the reference sits inside that type's own
+        /// declaration. A type that only refers to itself (recursion, factory methods) is
+        /// still unused.
+        /// </summary>
+        private void AddTypeReference(INamedTypeSymbol type, SyntaxNode node)
         {
+            // Constructed generics (List<int>) map back to their definition (List<T>)
+            var definition = type.OriginalDefinition;
+
+            foreach (var ancestor in node.Ancestors())
+            {
+                if (ancestor is not (BaseTypeDeclarationSyntax or DelegateDeclarationSyntax))
+                {
+                    continue;
+                }
+
+                var enclosing = _semanticModel.GetDeclaredSymbol(ancestor, _cancellationToken);
+                if (SymbolEqualityComparer.Default.Equals(enclosing, definition))
+                {
+                    return;
+                }
+            }
+
+            _references.Add(definition);
+        }
+
+        private void AddReference(ISymbol symbol, SyntaxNode node)
+        {
+            // Using a member (or constructing an instance) counts as using its type, so a type
+            // that is only reached through its members is not reported as unused.
+            if (symbol.Kind != SymbolKind.NamedType && symbol.ContainingType is { } owner)
+            {
+                AddTypeReference(owner, node);
+            }
+
+            if (symbol is INamedTypeSymbol namedType)
+            {
+                AddTypeReference(namedType, node);
+                return;
+            }
+
             // Unwrap property accessors to their containing property
             if (
                 symbol is IMethodSymbol method
@@ -166,6 +206,13 @@ public sealed class ReferenceWalker
             )
             {
                 symbol = method.AssociatedSymbol ?? symbol;
+            }
+
+            // An extension method called as x.Ext() resolves to a reduced form; map it back to
+            // the method that was declared
+            if (symbol is IMethodSymbol { ReducedFrom: { } reducedFrom })
+            {
+                symbol = reducedFrom;
             }
 
             // Unwrap constructed generic methods to their original definitions

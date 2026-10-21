@@ -9,8 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Unused type detection**: classes, structs, records, interfaces, enums and delegates that nothing references are now reported. Public types follow `--exclude-public`; test classes, types with an entry point, and types derived from or implementing framework types are never reported
 - **`--exclude-packages` option** to keep named NuGet packages from being reported as unused
 - **`--verbose` / `-v` option** to explain why each NuGet package was judged used, unused, or skipped
+
+### Fixed
+
+- Interface implementations (e.g. `IProgress<T>.Report`) are no longer reported as unused methods
+- Extension methods called as `x.Ext()` are no longer reported as unused
+- A declaration in a multi-targeted project is reported once instead of once per target framework
+- Report headings pluralize correctly ("Unused Properties" instead of "Unused Propertys")
 
 ## [1.3.1] - 2026-10-20
 

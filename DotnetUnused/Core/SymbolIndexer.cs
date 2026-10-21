@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace DotnetUnused.Core;
 
 /// <summary>
-/// Scans all documents to find declared symbols (Methods, Properties, Fields)
+/// Scans all documents to find declared symbols (Methods, Properties, Fields and Types)
 /// </summary>
 public sealed class SymbolIndexer
 {
@@ -64,6 +64,23 @@ public sealed class SymbolIndexer
                             case PropertyDeclarationSyntax property:
                                 symbol = semanticModel.GetDeclaredSymbol(property, ct);
                                 break;
+                            case BaseTypeDeclarationSyntax typeDecl:
+                                // Classes, structs, records, interfaces and enums
+                                AddType(
+                                    semanticModel.GetDeclaredSymbol(typeDecl, ct),
+                                    typeDecl,
+                                    typeDecl.Identifier.GetLocation(),
+                                    declaredSymbols
+                                );
+                                continue;
+                            case DelegateDeclarationSyntax delegateDecl:
+                                AddType(
+                                    semanticModel.GetDeclaredSymbol(delegateDecl, ct),
+                                    delegateDecl,
+                                    delegateDecl.Identifier.GetLocation(),
+                                    declaredSymbols
+                                );
+                                continue;
                             case FieldDeclarationSyntax field:
                                 // Fields can have multiple variable declarators
                                 foreach (var variable in field.Declaration.Variables)
@@ -95,6 +112,28 @@ public sealed class SymbolIndexer
         return declaredSymbols;
     }
 
+    private static void AddType(
+        ISymbol? symbol,
+        SyntaxNode node,
+        Location location,
+        ConcurrentBag<SymbolDefinition> declaredSymbols
+    )
+    {
+        if (symbol == null || !ShouldIndexSymbol(symbol))
+        {
+            return;
+        }
+
+        // A partial type has one declaration per part; index it once, at its first part.
+        var declarations = symbol.DeclaringSyntaxReferences;
+        if (declarations.Length > 1 && declarations[0].GetSyntax() != node)
+        {
+            return;
+        }
+
+        declaredSymbols.Add(new SymbolDefinition(symbol, location));
+    }
+
     private static bool ShouldAnalyze(string filePath) => FileFilter.ShouldAnalyze(filePath);
 
     /// <summary>
@@ -114,6 +153,12 @@ public sealed class SymbolIndexer
         if (symbol.ContainingType?.TypeKind == TypeKind.Interface)
         {
             return false;
+        }
+
+        // Types are indexed as-is: an abstract class or interface nobody references is unused.
+        if (symbol.Kind == SymbolKind.NamedType)
+        {
+            return true;
         }
 
         // Skip abstract members
@@ -140,7 +185,7 @@ public sealed class SymbolIndexer
             return false;
         }
 
-        // Only index method, property, and field symbols
+        // Only index method, property, and field symbols (types returned above)
         if (
             symbol.Kind != SymbolKind.Method
             && symbol.Kind != SymbolKind.Property
