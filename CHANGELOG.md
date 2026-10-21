@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--exclude-packages` option** to keep named NuGet packages from being reported as unused
+- **`--verbose` / `-v` option** to explain why each NuGet package was judged used, unused, or skipped
+
 ## [1.3.1] - 2026-10-20
 
 ### Added

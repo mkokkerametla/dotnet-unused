@@ -10,7 +10,15 @@ public sealed class UnusedPackageAnalyzer
 {
     private readonly PackageReferenceExtractor _extractor = new();
     private readonly NamespaceUsageScanner _scanner = new();
-    private readonly UnusedPackageDetector _detector = new();
+    private readonly UnusedPackageDetector _detector;
+
+    public UnusedPackageAnalyzer(
+        IEnumerable<string>? excludedPackages = null,
+        IProgress<string>? verbose = null
+    )
+    {
+        _detector = new UnusedPackageDetector(excludedPackages, verbose);
+    }
 
     /// <summary>
     /// Analyzes a solution for unused NuGet packages.

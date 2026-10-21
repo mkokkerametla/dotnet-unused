@@ -23,6 +23,16 @@ public class ArgumentParsingTests
         Assert.Equal(0, exitCode);
     }
 
+    [Theory]
+    [InlineData("MySolution.sln", "--exclude-packages")]
+    [InlineData("MySolution.sln", "--exclude-packages", "--verbose")]
+    public async Task Main_WithMissingExcludePackagesValue_ReturnsError(params string[] args)
+    {
+        var exitCode = await DotnetUnused.Program.Main(args);
+
+        Assert.Equal(1, exitCode);
+    }
+
     [Fact(Skip = "Requires actual CLI execution - use for manual testing")]
     public async Task Main_WithInvalidExcludePublicValue_ShowsError()
     {

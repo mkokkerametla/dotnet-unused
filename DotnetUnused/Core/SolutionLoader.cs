@@ -154,7 +154,6 @@ public sealed class SolutionLoader
                     $"Unsupported file type: {path}. Expected .sln, .slnx, or .csproj"
                 );
             }
-
         }
         catch (Exception ex) when (ex is not (OperationCanceledException or ArgumentException))
         {
