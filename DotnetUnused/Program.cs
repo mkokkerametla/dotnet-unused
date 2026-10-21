@@ -186,10 +186,10 @@ public class Program
             "  [cyan]--ignore-attributes[/]  Never flag members with these attributes (comma-separated)"
         );
         AnsiConsole.MarkupLine(
-            "  [cyan]--exclude-packages[/]  Never flag these NuGet packages as unused (comma-separated)"
+            "  [cyan]--exclude-packages[/]  Never flag these NuGet packages as unused (comma-separated; requires --unused-packages)"
         );
         AnsiConsole.MarkupLine(
-            "  [cyan]--verbose, -v[/]      Explain why each NuGet package was judged used, unused, or skipped"
+            "  [cyan]--verbose, -v[/]      Explain why each NuGet package was judged used, unused, or skipped (requires --unused-packages)"
         );
         AnsiConsole.MarkupLine(
             "  [cyan]--msbuild-path[/]     Directory of the MSBuild to use, e.g. a .NET SDK folder (or set DOTNET_UNUSED_MSBUILD_PATH)"
