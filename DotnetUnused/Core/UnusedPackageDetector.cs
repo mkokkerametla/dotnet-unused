@@ -58,6 +58,20 @@ public sealed class UnusedPackageDetector
         };
 
     private readonly NamespaceDeriver _namespaceDeriver = new();
+    private readonly HashSet<string> _excludedPackages;
+    private readonly IProgress<string>? _verbose;
+
+    public UnusedPackageDetector(
+        IEnumerable<string>? excludedPackages = null,
+        IProgress<string>? verbose = null
+    )
+    {
+        _excludedPackages = new HashSet<string>(
+            excludedPackages ?? Enumerable.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase
+        );
+        _verbose = verbose;
+    }
 
     /// <summary>
     /// Detects unused packages by comparing derived namespaces against found usages.
@@ -72,23 +86,33 @@ public sealed class UnusedPackageDetector
 
         foreach (var package in packages)
         {
+            // Skip packages the user explicitly excluded
+            if (_excludedPackages.Contains(package.PackageId))
+            {
+                _verbose?.Report($"Skipping {package.PackageId}: excluded by --exclude-packages");
+                continue;
+            }
+
             // Skip packages that contribute no compile-time assets (build/analyzer/runtime only,
             // e.g. DotNet.ReproducibleBuilds). They expose no namespace, so they can never be
             // detected as "used" and would otherwise be false positives.
             if (!package.IncludesCompileAssets)
             {
+                _verbose?.Report($"Skipping {package.PackageId}: no compile-time assets");
                 continue;
             }
 
             // Skip known build packages
             if (IsBuildOrToolingPackage(package.PackageId))
             {
+                _verbose?.Report($"Skipping {package.PackageId}: build or tooling package");
                 continue;
             }
 
             // Skip implicit usage packages
             if (ImplicitUsagePackages.Contains(package.PackageId))
             {
+                _verbose?.Report($"Skipping {package.PackageId}: implicitly used package");
                 continue;
             }
 
@@ -100,6 +124,14 @@ public sealed class UnusedPackageDetector
                 foundNamespaces.Contains(ns)
                 || foundNamespaces.Any(found => IsNamespaceMatch(ns, found))
             );
+
+            if (_verbose is not null)
+            {
+                _verbose.Report(
+                    $"{package.PackageId} ({package.ProjectName}): {(isUsed ? "used" : "unused")}; "
+                        + $"candidate namespaces: {string.Join(", ", candidateNamespaces)}"
+                );
+            }
 
             if (!isUsed)
             {
