@@ -7,7 +7,7 @@ A CLI tool for detecting unused code in .NET solutions using Roslyn static analy
 
 ## Features
 
-- Detects unused methods, properties, fields, and using directives
+- Detects unused types (classes, structs, records, interfaces, enums, delegates), methods, properties, fields, and using directives
 - Detects unused NuGet packages
 - Auto-fix support for removing unused usings
 - JSON export for CI/CD integration
