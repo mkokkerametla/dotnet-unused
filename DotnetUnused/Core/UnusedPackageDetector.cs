@@ -11,61 +11,70 @@ public sealed class UnusedPackageDetector
     /// Known build/tooling packages that don't have direct code usage.
     /// These should always be considered "used" as they provide build-time functionality.
     /// </summary>
-    private static readonly HashSet<string> KnownBuildPackages =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            // Test infrastructure (no direct code reference)
-            "Microsoft.NET.Test.Sdk",
-            "coverlet.collector",
-            "coverlet.msbuild",
-            "xunit.runner.visualstudio",
-            "NUnit3TestAdapter",
-            "MSTest.TestAdapter",
-            // Analyzers and code generation
-            "Microsoft.CodeAnalysis.Analyzers",
-            "Microsoft.CodeAnalysis.NetAnalyzers",
-            "StyleCop.Analyzers",
-            "SonarAnalyzer.CSharp",
-            "Roslynator.Analyzers",
-            "Microsoft.SourceLink.GitHub",
-            "MinVer",
-            // Build tools
-            "Microsoft.NET.Compilers.Toolset",
-            "Microsoft.Build.Tasks.Git",
-            "GitVersion.MsBuild",
-            "Nerdbank.GitVersioning",
-            // Native/runtime dependencies
-            "runtime.native.System",
-            "runtime.native.System.IO.Compression",
-            "Microsoft.NETCore.Platforms",
-            "Microsoft.NETCore.Targets",
-            // Package metadata
-            "Microsoft.PackageReference.Aliases"
-        };
+    private static readonly HashSet<string> KnownBuildPackages = new(
+        StringComparer.OrdinalIgnoreCase
+    )
+    {
+        // Test infrastructure (no direct code reference)
+        "Microsoft.NET.Test.Sdk",
+        "coverlet.collector",
+        "coverlet.msbuild",
+        "xunit.runner.visualstudio",
+        "NUnit3TestAdapter",
+        "MSTest.TestAdapter",
+        // Analyzers and code generation
+        "Microsoft.CodeAnalysis.Analyzers",
+        "Microsoft.CodeAnalysis.NetAnalyzers",
+        "StyleCop.Analyzers",
+        "SonarAnalyzer.CSharp",
+        "Roslynator.Analyzers",
+        "Microsoft.SourceLink.GitHub",
+        "MinVer",
+        // Build tools
+        "Microsoft.NET.Compilers.Toolset",
+        "Microsoft.Build.Tasks.Git",
+        "GitVersion.MsBuild",
+        "Nerdbank.GitVersioning",
+        // Native/runtime dependencies
+        "runtime.native.System",
+        "runtime.native.System.IO.Compression",
+        "Microsoft.NETCore.Platforms",
+        "Microsoft.NETCore.Targets",
+        // Package metadata
+        "Microsoft.PackageReference.Aliases",
+    };
 
     /// <summary>
     /// Known packages that provide implicit functionality without explicit using statements.
     /// </summary>
-    private static readonly HashSet<string> ImplicitUsagePackages =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            // These packages are typically used through inheritance or attributes
-            // that may not result in explicit namespace imports
-            "Microsoft.AspNetCore.App",
-            "Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation",
-            "Microsoft.AspNetCore.SpaProxy",
-            "Microsoft.AspNetCore.SpaServices.Extensions"
-        };
+    private static readonly HashSet<string> ImplicitUsagePackages = new(
+        StringComparer.OrdinalIgnoreCase
+    )
+    {
+        // These packages are typically used through inheritance or attributes
+        // that may not result in explicit namespace imports
+        "Microsoft.AspNetCore.App",
+        "Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation",
+        "Microsoft.AspNetCore.SpaProxy",
+        "Microsoft.AspNetCore.SpaServices.Extensions",
+    };
 
     private readonly NamespaceDeriver _namespaceDeriver = new();
 
     /// <summary>
     /// Detects unused packages by comparing derived namespaces against found usages.
+    /// A package also counts as used when any referenced symbol comes from one
+    /// of its compile assemblies (from the restore assets file). The assembly
+    /// check is what saves packages whose namespaces don't follow their package
+    /// ID and aren't in the well-known map; the namespace heuristic remains as
+    /// a fallback for projects without a restore assets file.
     /// </summary>
     public List<UnusedPackageInfo> DetectUnused(
         List<PackageReferenceInfo> packages,
         HashSet<string> foundNamespaces,
-        IProgress<string>? progress = null
+        IProgress<string>? progress = null,
+        IReadOnlyDictionary<string, HashSet<string>>? packageAssemblies = null,
+        HashSet<string>? usedAssemblyNames = null
     )
     {
         var unused = new List<UnusedPackageInfo>();
@@ -101,6 +110,20 @@ public sealed class UnusedPackageDetector
                 || foundNamespaces.Any(found => IsNamespaceMatch(ns, found))
             );
 
+            // Fall back to assembly evidence: if code references a type from
+            // one of this package's compile assemblies, the package is used
+            // even when no namespace guess matched.
+            if (
+                !isUsed
+                && packageAssemblies != null
+                && usedAssemblyNames != null
+                && packageAssemblies.TryGetValue(package.PackageId, out var assemblies)
+                && assemblies.Any(a => usedAssemblyNames.Contains(a))
+            )
+            {
+                isUsed = true;
+            }
+
             if (!isUsed)
             {
                 unused.Add(
@@ -110,7 +133,7 @@ public sealed class UnusedPackageDetector
                         Version = package.Version,
                         ProjectPath = package.ProjectPath,
                         ProjectName = package.ProjectName,
-                        CandidateNamespaces = candidateNamespaces.ToList()
+                        CandidateNamespaces = candidateNamespaces.ToList(),
                     }
                 );
             }

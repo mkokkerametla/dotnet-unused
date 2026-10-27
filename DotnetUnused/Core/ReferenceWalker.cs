@@ -128,7 +128,183 @@ public sealed class ReferenceWalker
         public override void VisitAssignmentExpression(AssignmentExpressionSyntax node)
         {
             ProcessNode(node);
+            // Deconstruction assignment: (a, b) = expr; implicitly calls expr.Deconstruct(...).
+            // There is no syntax node for that call, so record it explicitly.
+            if (node.Left is TupleExpressionSyntax tuple)
+            {
+                MarkDeconstructAsReferenced(node.Right, tuple.Arguments.Count);
+            }
+            // Deconstruction declaration: var (a, b) = expr; parses as an
+            // assignment whose left side is a declaration expression carrying
+            // a parenthesized designation (not a local declaration statement).
+            else if (
+                node.Left is DeclarationExpressionSyntax declaration
+                && declaration.Designation is ParenthesizedVariableDesignationSyntax designation
+            )
+            {
+                MarkDeconstructAsReferenced(node.Right, designation.Variables.Count);
+            }
             base.VisitAssignmentExpression(node);
+        }
+
+        public override void VisitUsingStatement(UsingStatementSyntax node)
+        {
+            // using (expr) implicitly calls expr.Dispose() (or DisposeAsync() for await using).
+            // There is no syntax node for that call, so record it explicitly.
+            if (node.Expression != null)
+            {
+                MarkDisposedAsReferenced(
+                    node.Expression,
+                    node.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword)
+                );
+            }
+            else if (node.Declaration != null)
+            {
+                foreach (var variable in node.Declaration.Variables)
+                {
+                    if (variable.Initializer?.Value != null)
+                    {
+                        MarkDisposedAsReferenced(
+                            variable.Initializer.Value,
+                            node.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword)
+                        );
+                    }
+                }
+            }
+            base.VisitUsingStatement(node);
+        }
+
+        public override void VisitLocalDeclarationStatement(LocalDeclarationStatementSyntax node)
+        {
+            // using var x = expr; implicitly calls expr.Dispose() (or DisposeAsync()).
+            if (node.UsingKeyword.IsKind(SyntaxKind.UsingKeyword) && node.Declaration != null)
+            {
+                foreach (var variable in node.Declaration.Variables)
+                {
+                    if (variable.Initializer?.Value != null)
+                    {
+                        MarkDisposedAsReferenced(
+                            variable.Initializer.Value,
+                            node.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword)
+                        );
+                    }
+                }
+            }
+
+            base.VisitLocalDeclarationStatement(node);
+        }
+
+        public override void VisitForEachStatement(ForEachStatementSyntax node)
+        {
+            // foreach implicitly calls GetEnumerator(), MoveNext(), and the Current
+            // property. Record all three explicitly via the semantic model.
+            AddForEachInfo(_semanticModel.GetForEachStatementInfo(node));
+            base.VisitForEachStatement(node);
+        }
+
+        public override void VisitForEachVariableStatement(ForEachVariableStatementSyntax node)
+        {
+            var info = _semanticModel.GetForEachStatementInfo(node);
+            AddForEachInfo(info);
+
+            // foreach (var (a, b) in xs) additionally deconstructs each element.
+            var designation = node.DescendantNodes()
+                .OfType<ParenthesizedVariableDesignationSyntax>()
+                .FirstOrDefault();
+            if (designation != null)
+            {
+                var elementType = info.CurrentProperty?.Type;
+                if (elementType != null)
+                {
+                    var deconstruct = FindMethod(
+                        elementType,
+                        "Deconstruct",
+                        designation.Variables.Count
+                    );
+                    if (deconstruct != null)
+                    {
+                        AddReference(deconstruct);
+                    }
+                }
+            }
+
+            base.VisitForEachVariableStatement(node);
+        }
+
+        private void AddForEachInfo(ForEachStatementInfo info)
+        {
+            if (info.GetEnumeratorMethod != null)
+            {
+                AddReference(info.GetEnumeratorMethod);
+            }
+            if (info.MoveNextMethod != null)
+            {
+                AddReference(info.MoveNextMethod);
+            }
+            if (info.CurrentProperty != null)
+            {
+                AddReference(info.CurrentProperty);
+            }
+        }
+
+        private void MarkDisposedAsReferenced(ExpressionSyntax expression, bool awaitUsing)
+        {
+            var type = _semanticModel.GetTypeInfo(expression, _cancellationToken).Type;
+            if (type == null)
+            {
+                return;
+            }
+
+            var methodName = awaitUsing ? "DisposeAsync" : "Dispose";
+            var method = FindMethod(type, methodName, 0);
+            if (method != null)
+            {
+                AddReference(method);
+            }
+        }
+
+        private void MarkDeconstructAsReferenced(ExpressionSyntax expression, int arity)
+        {
+            var type = _semanticModel.GetTypeInfo(expression, _cancellationToken).Type;
+            if (type == null)
+            {
+                return;
+            }
+
+            var method = FindMethod(type, "Deconstruct", arity);
+            if (method != null)
+            {
+                AddReference(method);
+            }
+        }
+
+        /// <summary>
+        /// Finds a method by name and parameter count, walking the base-type chain
+        /// so inherited methods (e.g. Dispose from a base class) are found too.
+        /// </summary>
+        private static IMethodSymbol? FindMethod(ITypeSymbol type, string name, int parameterCount)
+        {
+            for (var current = type; current != null; current = current.BaseType)
+            {
+                if (current is not INamedTypeSymbol namedType)
+                {
+                    continue;
+                }
+
+                foreach (var member in namedType.GetMembers(name))
+                {
+                    if (
+                        member is IMethodSymbol method
+                        && method.Parameters.Length == parameterCount
+                        && method.MethodKind == MethodKind.Ordinary
+                    )
+                    {
+                        return method;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private void ProcessNode(SyntaxNode node)
@@ -168,36 +344,17 @@ public sealed class ReferenceWalker
                 symbol = method.AssociatedSymbol ?? symbol;
             }
 
-            // Unwrap constructed generic methods to their original definitions
-            // e.g., GetAsync<MyClass>() should map to GetAsync<T>()
-            if (
-                symbol is IMethodSymbol methodSymbol
-                && methodSymbol.IsGenericMethod
-                && !methodSymbol.IsDefinition
-            )
+            // Normalize constructed symbols to their definitions so they match
+            // the declared symbols, which are always definitions. OriginalDefinition
+            // preserves the signature: a call to Box<int>.Foo(string) maps to
+            // Box<T>.Foo(string), not to the first overload named Foo. (A previous
+            // name-only lookup on the original definition did exactly that, and
+            // reported the called overload as unused while treating an uncalled
+            // overload as used.) This also covers generic method instantiations
+            // such as GetAsync<MyClass>() -> GetAsync<T>().
+            if (!symbol.IsDefinition)
             {
-                symbol = methodSymbol.OriginalDefinition;
-            }
-
-            // Unwrap methods/properties/fields of constructed generic types
-            // e.g., List<int>.Add should map to List<T>.Add
-            if (
-                symbol.ContainingType is INamedTypeSymbol containingType
-                && containingType.IsGenericType
-                && !containingType.IsDefinition
-            )
-            {
-                var originalType = containingType.OriginalDefinition;
-
-                // Find the corresponding member in the original definition
-                var originalMember = originalType
-                    .GetMembers(symbol.Name)
-                    .FirstOrDefault(m => m.Kind == symbol.Kind);
-
-                if (originalMember != null)
-                {
-                    symbol = originalMember;
-                }
+                symbol = symbol.OriginalDefinition;
             }
 
             // Only track methods, properties, and fields

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using DotnetUnused.Models;
+using Microsoft.CodeAnalysis;
 using Spectre.Console;
 
 namespace DotnetUnused.Reporting;
@@ -63,7 +64,7 @@ public sealed class ReportWriter
         {
             AnsiConsole.WriteLine();
             AnsiConsole.Write(
-                new Rule($"[cyan]Unused {group.Key}s ({group.Count()})[/]")
+                new Rule($"[cyan]Unused {Pluralize(group.Key)} ({group.Count()})[/]")
                     .RuleStyle("grey")
                     .LeftJustified()
             );
@@ -175,7 +176,7 @@ public sealed class ReportWriter
                 UnusedUsingsCount = result.UnusedUsings.Count,
                 UnusedPackagesCount = result.UnusedPackages.Count,
                 TotalPackagesAnalyzed = result.TotalPackagesAnalyzed,
-                DurationSeconds = result.Duration.TotalSeconds
+                DurationSeconds = result.Duration.TotalSeconds,
             },
             UnusedSymbols = result
                 .UnusedSymbols.Select(s => new
@@ -183,7 +184,7 @@ public sealed class ReportWriter
                     Kind = s.Kind.ToString(),
                     s.FullyQualifiedName,
                     s.FilePath,
-                    s.LineNumber
+                    s.LineNumber,
                 })
                 .OrderBy(s => s.FilePath)
                 .ThenBy(s => s.LineNumber)
@@ -194,7 +195,7 @@ public sealed class ReportWriter
                     u.FilePath,
                     u.LineNumber,
                     u.Namespace,
-                    u.Message
+                    u.Message,
                 })
                 .OrderBy(u => u.FilePath)
                 .ThenBy(u => u.LineNumber)
@@ -206,17 +207,17 @@ public sealed class ReportWriter
                     p.ProjectPath,
                     p.PackageId,
                     p.Version,
-                    p.CandidateNamespaces
+                    p.CandidateNamespaces,
                 })
                 .OrderBy(p => p.ProjectName)
                 .ThenBy(p => p.PackageId)
-                .ToList()
+                .ToList(),
         };
 
         var options = new JsonSerializerOptions
         {
             WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
         var json = JsonSerializer.Serialize(jsonData, options);
@@ -326,7 +327,9 @@ public sealed class ReportWriter
         }
 
         await File.WriteAllTextAsync(outputPath, sb.ToString());
-        AnsiConsole.MarkupLine($"[green]Markdown report written to: {Markup.Escape(outputPath)}[/]");
+        AnsiConsole.MarkupLine(
+            $"[green]Markdown report written to: {Markup.Escape(outputPath)}[/]"
+        );
     }
 
     /// <summary>
@@ -334,4 +337,15 @@ public sealed class ReportWriter
     /// </summary>
     private static string EscapeMarkdown(string value) =>
         value.Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
+
+    /// <summary>
+    /// Pluralizes a symbol-kind name for report headings. The previous code
+    /// just appended "s", which produced "Unused Propertys".
+    /// </summary>
+    private static string Pluralize(SymbolKind kind) =>
+        kind switch
+        {
+            SymbolKind.Property => "Properties",
+            _ => kind.ToString() + "s",
+        };
 }

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--fail-on-unused` option** - exit with code 2 when any unused code is found, for CI gating (previously the tool always exited 0 on a successful analysis)
+- **`--strict` option** - treat project load errors as fatal instead of analyzing a partially loaded solution
+- **`--include-virtual` option** - also report unused virtual members (virtuals remain skipped by default)
+- **Assembly-based package evidence** - unused-package detection now also checks the assemblies recorded in `obj/project.assets.json`, so packages whose namespaces don't follow their package ID are recognized as used
+
+### Fixed
+
+- **Interface implementations no longer falsely flagged** - a method or property implementing an interface member now counts as used when that interface member is referenced anywhere (explicit implementations, which can only be reached through the interface, were flagged even with default settings)
+- **Generic overload misattribution** - calls on constructed generic types used to map to the first-declared overload by name, flagging the called overload and sparing the uncalled one; references now normalize via `OriginalDefinition`, preserving signatures
+- **Implicit calls are now tracked** - `using` / `await using` (`Dispose` / `DisposeAsync`), `foreach` (`GetEnumerator` / `MoveNext` / `Current`), and deconstruction (`Deconstruct`) no longer look like unused members
+- **"Unused Propertys" heading typo** in the console report
+- **Argument parser hardening** - unknown flags and invalid `--format` values are now errors instead of being silently ignored; `--help` works in any position
+
+
 ## [1.3.1] - 2026-10-20
 
 ### Added

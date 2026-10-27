@@ -13,7 +13,10 @@ public sealed class UnusedDetector
     private readonly bool _excludePublicApi;
     private readonly HashSet<string> _ignoredAttributes;
 
-    public UnusedDetector(bool excludePublicApi = true, IEnumerable<string>? ignoreAttributes = null)
+    public UnusedDetector(
+        bool excludePublicApi = true,
+        IEnumerable<string>? ignoreAttributes = null
+    )
     {
         _excludePublicApi = excludePublicApi;
         _ignoredAttributes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -53,11 +56,31 @@ public sealed class UnusedDetector
         var result = new AnalysisResult
         {
             TotalSymbolsAnalyzed = declaredSymbols.Count,
-            TotalReferencesFound = referencedSymbols.Count
+            TotalReferencesFound = referencedSymbols.Count,
         };
 
         // Create a HashSet of referenced symbols for fast lookup
         var referencedSet = new HashSet<ISymbol>(referencedSymbols, SymbolEqualityComparer.Default);
+
+        // A call through an interface resolves to the interface member, not to
+        // the method or property that implements it. Without this expansion,
+        // every interface implementation called only through its interface
+        // (including every explicit implementation, which can only be reached
+        // that way) would be reported as unused. So: if an interface member is
+        // referenced anywhere, every declared implementation of it counts as
+        // referenced too. Implementations whose interface member is never
+        // referenced are still reported, so true positives are preserved.
+        foreach (var declared in declaredSymbols)
+        {
+            foreach (var interfaceMember in GetImplementedInterfaceMembers(declared.Symbol))
+            {
+                if (referencedSet.Contains(interfaceMember))
+                {
+                    referencedSet.Add(declared.Symbol);
+                    break;
+                }
+            }
+        }
 
         // Find symbols that are declared but not referenced
         foreach (var declared in declaredSymbols)
@@ -301,6 +324,13 @@ public sealed class UnusedDetector
         // 2. Return void
         // 3. Have typical event handler signatures (object sender, EventArgs e)
         // 4. Named with common patterns: Button_Click, OnLoaded, HandleSomething, etc.
+        //
+        // NOTE: this is deliberately name-based and broad (any private void
+        // method named On* with a matching signature is spared). XAML bindings
+        // are not visible to the reference walker, so a name heuristic is the
+        // only way to avoid flagging handlers; the cost is that a genuinely
+        // unused helper with an event-handler-like name is also spared. That
+        // false-negative tradeoff is intentional for a cleanup tool.
 
         if (symbol is not IMethodSymbol method)
         {
@@ -356,5 +386,62 @@ public sealed class UnusedDetector
     private static bool IsConstructor(ISymbol symbol)
     {
         return symbol is IMethodSymbol method && method.MethodKind == MethodKind.Constructor;
+    }
+
+    /// <summary>
+    /// Yields the interface members (methods or properties) that a declared
+    /// symbol implements, if any. Covers both implicit implementations (a
+    /// public method with a matching signature, found via
+    /// <see cref="INamedTypeSymbol.FindImplementationForInterfaceMember"/>)
+    /// and explicit implementations (e.g. <c>void IDisposable.Dispose()</c>).
+    /// Explicit implementations must be read off
+    /// <c>ExplicitInterfaceImplementations</c> directly: their
+    /// <see cref="ISymbol.Name"/> is the qualified
+    /// <c>"System.IDisposable.Dispose"</c>, so a name lookup on the interface
+    /// finds nothing.
+    /// </summary>
+    private static IEnumerable<ISymbol> GetImplementedInterfaceMembers(ISymbol symbol)
+    {
+        if (symbol is IMethodSymbol method)
+        {
+            foreach (var explicitImpl in method.ExplicitInterfaceImplementations)
+            {
+                yield return explicitImpl;
+            }
+        }
+        else if (symbol is IPropertySymbol property)
+        {
+            foreach (var explicitImpl in property.ExplicitInterfaceImplementations)
+            {
+                yield return explicitImpl;
+            }
+        }
+        else
+        {
+            yield break;
+        }
+
+        var containingType = symbol.ContainingType;
+        if (containingType == null)
+        {
+            yield break;
+        }
+
+        foreach (var iface in containingType.AllInterfaces)
+        {
+            foreach (var member in iface.GetMembers(symbol.Name))
+            {
+                if (
+                    member.Kind == symbol.Kind
+                    && SymbolEqualityComparer.Default.Equals(
+                        containingType.FindImplementationForInterfaceMember(member),
+                        symbol
+                    )
+                )
+                {
+                    yield return member;
+                }
+            }
+        }
     }
 }
