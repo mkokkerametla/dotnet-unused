@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Unused type detection**: classes, structs, records, interfaces, enums and delegates that nothing references are now reported. Public types follow `--exclude-public`; test classes, types with an entry point, and types derived from or implementing framework types are never reported
+- **Unused type detection**: classes, structs, records, interfaces, enums and delegates that nothing references are now reported. Public types follow `--exclude-public`; test classes, types with an entry point, and types derived from or implementing framework types are never reported (custom exception and attribute types still are)
 - **`--exclude-packages` option** to keep named NuGet packages from being reported as unused
 - **`--verbose` / `-v` option** to explain why each NuGet package was judged used, unused, or skipped
 - **`--fail-on-unused` option** - exit with code 2 when any unused code is found, for CI gating (previously the tool always exited 0 on a successful analysis)
@@ -19,9 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Interface implementations no longer falsely flagged** - a method or property implementing an interface member now counts as used when that interface member is referenced anywhere (explicit implementations, which can only be reached through the interface, were flagged even with default settings)
+- **Interface implementations no longer falsely flagged** - a method or property implementing an interface member now counts as used when that interface member is referenced anywhere, and implementations of interfaces from outside the solution (`IEnumerable`, `IComparer<T>`, ...) always count as used because framework code calls them (explicit implementations, which can only be reached through the interface, were flagged even with default settings)
 - **Generic overload misattribution** - calls on constructed generic types used to map to the first-declared overload by name, flagging the called overload and sparing the uncalled one; references now normalize via `OriginalDefinition`, preserving signatures
-- **Implicit calls are now tracked** - `using` / `await using` (`Dispose` / `DisposeAsync`), `foreach` (`GetEnumerator` / `MoveNext` / `Current`), and deconstruction (`Deconstruct`) no longer look like unused members
+- **Implicit calls are now tracked** - `using` / `await using` (`Dispose` / `DisposeAsync`), `foreach` (`GetEnumerator` / `MoveNext` / `Current`), and deconstruction (`Deconstruct`, including extension and nested deconstruction) no longer look like unused members
 - **"Unused Propertys" heading typo** in the console report
 - **Argument parser hardening** - unknown flags and invalid `--format` values are now errors instead of being silently ignored; `--help` works in any position
 - Extension methods called as `x.Ext()` are no longer reported as unused

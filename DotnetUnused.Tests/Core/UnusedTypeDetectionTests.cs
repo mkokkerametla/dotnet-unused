@@ -214,6 +214,92 @@ public class UnusedTypeDetectionTests
     }
 
     [Fact]
+    public async Task FrameworkInterfaceImplementationsAreNotReportedAsUnused()
+    {
+        var unused = await FindUnusedAsync(
+            """
+            using System.Collections;
+            using System.Collections.Generic;
+            internal class Bag : IEnumerable<int>
+            {
+                public IEnumerator<int> GetEnumerator() { yield return 1; }
+                IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+            internal class Cmp : IComparer<int>
+            {
+                int IComparer<int>.Compare(int a, int b) => a - b;
+            }
+            internal class Entry
+            {
+                public static void Main()
+                {
+                    foreach (var x in new Bag()) { }
+                    new List<int>().Sort(new Cmp());
+                }
+            }
+            """
+        );
+
+        Assert.DoesNotContain(unused, u => u.Name.EndsWith("GetEnumerator"));
+        Assert.DoesNotContain(unused, u => u.Name.EndsWith("Compare"));
+    }
+
+    [Fact]
+    public async Task SourceInterfaceImplementationIsReportedWhenInterfaceMemberIsUnused()
+    {
+        var unused = await FindUnusedAsync(
+            """
+            internal interface IWorker { void Work(); }
+            internal class Worker : IWorker { void IWorker.Work() { } }
+            internal class Entry { public static void Main() { IWorker w = new Worker(); } }
+            """
+        );
+
+        Assert.Contains(unused, u => u.Name.EndsWith("Work"));
+    }
+
+    [Fact]
+    public async Task ReportsUnusedCustomExceptions()
+    {
+        var unused = await FindUnusedAsync(
+            """
+            using System;
+            internal class MyError : Exception { }
+            internal class MyInvalidOperation : InvalidOperationException { }
+            """
+        );
+
+        Assert.Contains(("Class", "MyError"), unused);
+        Assert.Contains(("Class", "MyInvalidOperation"), unused);
+    }
+
+    [Fact]
+    public async Task ExtensionDeconstructCountsAsUse()
+    {
+        var unused = await FindUnusedAsync(
+            """
+            internal record struct P(int X);
+            internal static class Ext
+            {
+                internal static void Deconstruct(this P p, out int a, out int b) { a = p.X; b = 0; }
+            }
+            internal class Entry
+            {
+                public static int Main()
+                {
+                    var (a, b) = new P(1);
+                    foreach (var (c, d) in new[] { new P(2) }) { a += c + d; }
+                    return a + b;
+                }
+            }
+            """
+        );
+
+        Assert.DoesNotContain(unused, u => u.Name == "Deconstruct");
+        Assert.DoesNotContain(unused, u => u.Name == "Ext");
+    }
+
+    [Fact]
     public async Task SameDeclarationInMultipleTargetsIsReportedOnce()
     {
         var unused = await FindUnusedAsync("internal class Orphan { }", projectCopies: 2);

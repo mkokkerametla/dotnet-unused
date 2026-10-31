@@ -73,6 +73,9 @@ public sealed class UnusedDetector
         // References are stored normalized to their original definitions, so
         // normalize the interface member the same way before comparing:
         // a call through IProgress<string> is stored as IProgress<T>.Report.
+        // Members of interfaces declared outside the solution (IEnumerable,
+        // IComparer<T>, ...) are mostly called by framework code the walker never
+        // sees, so implementations of those always count as referenced.
         foreach (var declared in declaredSymbols)
         {
             foreach (var interfaceMember in GetImplementedInterfaceMembers(declared.Symbol))
@@ -80,7 +83,10 @@ public sealed class UnusedDetector
                 var memberToCheck = interfaceMember.IsDefinition
                     ? interfaceMember
                     : interfaceMember.OriginalDefinition;
-                if (referencedSet.Contains(memberToCheck))
+                if (
+                    memberToCheck.Locations.Any(l => l.IsInMetadata)
+                    || referencedSet.Contains(memberToCheck)
+                )
                 {
                     referencedSet.Add(declared.Symbol);
                     break;
@@ -242,6 +248,10 @@ public sealed class UnusedDetector
             return false;
         }
 
+        // Interfaces that come with an attribute or exception base class (Exception implements
+        // ISerializable) say nothing about framework activation
+        IEnumerable<INamedTypeSymbol> inheritedInterfaces = [];
+
         for (var baseType = type.BaseType; baseType != null; baseType = baseType.BaseType)
         {
             if (
@@ -257,22 +267,42 @@ public sealed class UnusedDetector
                 continue;
             }
 
-            // Attribute and exception types are only ever used by being named in code
-            if (baseType.Name is "Attribute" or "Exception")
+            // Attribute and exception types (including those derived from framework exceptions
+            // such as InvalidOperationException) are only ever used by being named in code
+            if (IsAttributeOrException(baseType))
             {
+                inheritedInterfaces = baseType.AllInterfaces;
                 break;
             }
 
             return true;
         }
 
-        return type.AllInterfaces.Any(i =>
-            i.Locations.Any(l => l.IsInMetadata)
-            && i.ContainingNamespace?.ToDisplayString() is not ("System" or null)
-            && !i.ContainingNamespace.ToDisplayString().StartsWith("System.Collections")
-        );
+        return type
+            .AllInterfaces.Except(inheritedInterfaces, SymbolEqualityComparer.Default)
+            .OfType<INamedTypeSymbol>()
+            .Any(i =>
+                i.Locations.Any(l => l.IsInMetadata)
+                && i.ContainingNamespace?.ToDisplayString() is not ("System" or null)
+                && !i.ContainingNamespace.ToDisplayString().StartsWith("System.Collections")
+            );
     }
 
+    private static bool IsAttributeOrException(INamedTypeSymbol type)
+    {
+        for (var current = type; current != null; current = current.BaseType)
+        {
+            if (
+                current.Name is "Attribute" or "Exception"
+                && current.ContainingNamespace?.ToDisplayString() == "System"
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool IsEntryPoint(ISymbol symbol)
     {
