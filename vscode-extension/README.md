@@ -15,7 +15,7 @@ Detect and highlight unused code in .NET solutions directly in Visual Studio Cod
 - **Configurable Severity**: Set diagnostic severity (Error, Warning, Information, Hint)
 - **Optional Analysis**: Skip usings analysis with configuration setting
 - **Jump to Definition**: Click any unused symbol in the tree view to navigate to its location
-- **Export Reports**: Generate JSON reports of unused code (coming soon)
+- **Export Reports**: Save the analysis as a JSON report (for CI and scripts) or a Markdown report (for pull requests and sharing)
 
 ## Requirements
 
@@ -42,7 +42,7 @@ Access commands via Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 - **Dotnet Unused: Fix Unused Using Directives** ✨ (New in v1.2.0) - Auto-remove unused usings
 - **Dotnet Unused: Install/Update CLI Tool** ✨ (New in v1.2.0) - Install or update the CLI
 - **Dotnet Unused: Clear Unused Code Diagnostics** - Clear all diagnostics from the editor
-- **Dotnet Unused: Export Unused Code Report (JSON)** - Export analysis results (coming soon)
+- **Dotnet Unused: Export Unused Code Report** - Save the analysis as a JSON or Markdown file, then open it
 
 ### Tree View
 

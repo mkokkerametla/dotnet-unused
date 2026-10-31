@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Export report**: the "Export Unused Code Report" command now saves the analysis as a JSON or Markdown file and offers to open it (previously it showed "coming soon")
+
+### Fixed
+
+- Analysis no longer fails when the solution or project path contains a space (the CLI was run through a shell without quoting its arguments)
+- `.slnx` solutions are now offered when picking a solution to analyze, fix or export
+
 ## [1.0.0] - 2025-12-29
 
 ### Added
