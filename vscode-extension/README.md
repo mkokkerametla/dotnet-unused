@@ -2,6 +2,20 @@
 
 Detect and highlight unused code in .NET solutions directly in Visual Studio Code using Roslyn static analysis.
 
+## Demo
+
+Real run on a small sample project. VS Code finds 3 unused symbols, and the CLI on the same project also finds 1 unused using.
+
+![Unused code underlined in the editor, with the Dotnet Unused output](images/demo-results.png)
+
+![Problems panel: unused field, property, and method](images/demo-problems.png)
+
+![Dotnet Unused sidebar tree, grouped by kind](images/demo-sidebar.png)
+
+![CLI on the same project: 3 unused symbols, 1 unused using](images/demo-cli.png)
+
+[Watch the 26-second demo video (MP4)](images/demo.mp4)
+
 ## Features
 
 - **✨ One-Click CLI Installation** (New in v1.2.0): Automatically installs CLI tool if missing
