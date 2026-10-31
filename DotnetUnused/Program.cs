@@ -37,6 +37,8 @@ public class Program
             var strict = false;
             var includeVirtual = false;
             var ignoreAttributes = new List<string>();
+            var excludePackages = new List<string>();
+            var verbose = false;
             string? msbuildPath = null;
 
             // Parse options. Unknown flags and missing/invalid values are errors:
@@ -78,6 +80,27 @@ public class Program
                         break;
                     case "--unused-packages":
                         unusedPackages = true;
+                        break;
+                    case "--verbose"
+                    or "-v":
+                        verbose = true;
+                        break;
+                    case "--exclude-packages":
+                        if (i + 1 >= args.Length || args[i + 1].StartsWith('-'))
+                        {
+                            AnsiConsole.MarkupLine(
+                                "[red]--exclude-packages requires a comma-separated list of package IDs.[/]"
+                            );
+                            return 1;
+                        }
+                        excludePackages.AddRange(
+                            args[++i]
+                                .Split(
+                                    ',',
+                                    StringSplitOptions.RemoveEmptyEntries
+                                        | StringSplitOptions.TrimEntries
+                                )
+                        );
                         break;
                     case "--fail-on-unused":
                         failOnUnused = true;
@@ -133,6 +156,8 @@ public class Program
                 fixUsings,
                 unusedPackages,
                 ignoreAttributes,
+                excludePackages,
+                verbose,
                 msbuildPath,
                 strict,
                 includeVirtual,
@@ -218,6 +243,12 @@ public class Program
             "  [cyan]--ignore-attributes[/]  Never flag members with these attributes (comma-separated)"
         );
         AnsiConsole.MarkupLine(
+            "  [cyan]--exclude-packages[/]  Never flag these NuGet packages as unused (comma-separated; requires --unused-packages)"
+        );
+        AnsiConsole.MarkupLine(
+            "  [cyan]--verbose, -v[/]      Explain why each NuGet package was judged used, unused, or skipped (requires --unused-packages)"
+        );
+        AnsiConsole.MarkupLine(
             "  [cyan]--msbuild-path[/]     Directory of the MSBuild to use, e.g. a .NET SDK folder (or set DOTNET_UNUSED_MSBUILD_PATH)"
         );
         AnsiConsole.MarkupLine("  [cyan]--help, -h[/]         Show help information");
@@ -237,6 +268,9 @@ public class Program
         AnsiConsole.MarkupLine(
             "  dotnet-unused MySolution.sln --ignore-attributes TestInitialize,SetUp"
         );
+        AnsiConsole.MarkupLine(
+            "  dotnet-unused MySolution.sln --unused-packages --exclude-packages Humanizer,Polly --verbose"
+        );
     }
 
     private static async Task<DotnetUnused.Models.AnalysisResult> ScanAsync(
@@ -248,6 +282,8 @@ public class Program
         bool fixUsings,
         bool unusedPackages,
         List<string> ignoreAttributes,
+        List<string> excludePackages,
+        bool verbose,
         string? msbuildPath,
         bool strict,
         bool includeVirtual,
@@ -259,9 +295,9 @@ public class Program
         AnsiConsole.Write(new FigletText("Dotnet Unused").Color(Color.Cyan1));
         AnsiConsole.WriteLine();
 
-        IProgress<string> progress = new Progress<string>(msg =>
-            AnsiConsole.MarkupLine($"[grey]{Markup.Escape(msg)}[/]")
-        );
+        IProgress<string> progress = new ConsoleProgress();
+
+        IProgress<string>? verboseProgress = verbose ? progress : null;
 
         // Load solution
         cancellationToken.ThrowIfCancellationRequested();
@@ -352,7 +388,7 @@ public class Program
         if (unusedPackages)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var packageAnalyzer = new UnusedPackageAnalyzer();
+            var packageAnalyzer = new UnusedPackageAnalyzer(excludePackages, verboseProgress);
             // Assemblies behind referenced symbols let the package detector
             // recognize a package even when its namespaces don't follow its
             // package ID (the namespace-guessing heuristic alone misses those).
@@ -396,5 +432,15 @@ public class Program
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Writes progress straight to the console. Unlike <see cref="Progress{T}"/> it does not
+    /// post to the thread pool, so messages stay in the order they were reported.
+    /// </summary>
+    private sealed class ConsoleProgress : IProgress<string>
+    {
+        public void Report(string value) =>
+            AnsiConsole.MarkupLine($"[grey]{Markup.Escape(value)}[/]");
     }
 }

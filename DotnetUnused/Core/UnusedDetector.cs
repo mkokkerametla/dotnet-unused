@@ -70,11 +70,17 @@ public sealed class UnusedDetector
         // referenced anywhere, every declared implementation of it counts as
         // referenced too. Implementations whose interface member is never
         // referenced are still reported, so true positives are preserved.
+        // References are stored normalized to their original definitions, so
+        // normalize the interface member the same way before comparing:
+        // a call through IProgress<string> is stored as IProgress<T>.Report.
         foreach (var declared in declaredSymbols)
         {
             foreach (var interfaceMember in GetImplementedInterfaceMembers(declared.Symbol))
             {
-                if (referencedSet.Contains(interfaceMember))
+                var memberToCheck = interfaceMember.IsDefinition
+                    ? interfaceMember
+                    : interfaceMember.OriginalDefinition;
+                if (referencedSet.Contains(memberToCheck))
                 {
                     referencedSet.Add(declared.Symbol);
                     break;
@@ -82,16 +88,25 @@ public sealed class UnusedDetector
             }
         }
 
-        // Find symbols that are declared but not referenced
-        foreach (var declared in declaredSymbols)
+        // Find symbols that are declared but not referenced. A multi-targeted project is loaded
+        // once per target framework, so the same declaration can appear several times with
+        // distinct symbols. Report it once, and only if it is unused in every target.
+        var declarations = declaredSymbols
+            .GroupBy(d => (d.FilePath, d.LineNumber, d.FullyQualifiedName))
+            .OrderBy(g => g.Key.FilePath, StringComparer.Ordinal)
+            .ThenBy(g => g.Key.LineNumber);
+
+        foreach (var declaration in declarations)
         {
-            if (!referencedSet.Contains(declared.Symbol))
-            {
+            var isUnused = declaration.All(d =>
+                !referencedSet.Contains(d.Symbol)
                 // Apply heuristics to avoid false positives
-                if (ShouldReportAsUnused(declared.Symbol))
-                {
-                    result.AddUnusedSymbol(declared);
-                }
+                && ShouldReportAsUnused(d.Symbol)
+            );
+
+            if (isUnused)
+            {
+                result.AddUnusedSymbol(declaration.First());
             }
         }
 
@@ -104,6 +119,11 @@ public sealed class UnusedDetector
     /// </summary>
     private bool ShouldReportAsUnused(ISymbol symbol)
     {
+        if (symbol is INamedTypeSymbol type)
+        {
+            return ShouldReportTypeAsUnused(type);
+        }
+
         // Entry points - never report as unused
         if (IsEntryPoint(symbol))
         {
@@ -161,6 +181,98 @@ public sealed class UnusedDetector
 
         return true;
     }
+
+    /// <summary>
+    /// Applies heuristics to a type that no code in the solution refers to.
+    /// </summary>
+    private bool ShouldReportTypeAsUnused(INamedTypeSymbol type)
+    {
+        // Public API - configurable
+        if (_excludePublicApi && type.DeclaredAccessibility == Accessibility.Public)
+        {
+            return false;
+        }
+
+        if (
+            HasIgnoredAttribute(type)
+            || HasUsedImplicitlyAttribute(type)
+            || ContainsEntryPoint(type)
+            || IsTestType(type)
+            || IsInstantiatedByFramework(type)
+        )
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool ContainsEntryPoint(INamedTypeSymbol type) =>
+        type.GetMembers().OfType<IMethodSymbol>().Any(IsEntryPoint);
+
+    private static bool IsTestType(INamedTypeSymbol type)
+    {
+        foreach (var attr in type.GetAttributes())
+        {
+            if (
+                attr.AttributeClass?.Name
+                is "TestClassAttribute"
+                    or "TestFixtureAttribute"
+                    or "CollectionDefinitionAttribute"
+            )
+            {
+                return true;
+            }
+        }
+
+        // xUnit and friends have no class-level attribute; a type with test methods is a test class
+        return type.GetMembers().OfType<IMethodSymbol>().Any(IsTestMethod);
+    }
+
+    /// <summary>
+    /// Types that derive from a framework class or implement a framework interface are
+    /// commonly created by the runtime (controllers, hosted services, middleware, converters,
+    /// DbContexts, ...) with no reference in source, so they are never reported.
+    /// </summary>
+    private static bool IsInstantiatedByFramework(INamedTypeSymbol type)
+    {
+        // Delegates and enums inherit framework interfaces (ISerializable, ...) implicitly
+        if (type.TypeKind is TypeKind.Delegate or TypeKind.Enum)
+        {
+            return false;
+        }
+
+        for (var baseType = type.BaseType; baseType != null; baseType = baseType.BaseType)
+        {
+            if (
+                baseType.Locations.All(l => !l.IsInMetadata)
+                || baseType.SpecialType
+                    is SpecialType.System_Object
+                        or SpecialType.System_ValueType
+                        or SpecialType.System_Enum
+                        or SpecialType.System_MulticastDelegate
+                        or SpecialType.System_Delegate
+            )
+            {
+                continue;
+            }
+
+            // Attribute and exception types are only ever used by being named in code
+            if (baseType.Name is "Attribute" or "Exception")
+            {
+                break;
+            }
+
+            return true;
+        }
+
+        return type.AllInterfaces.Any(i =>
+            i.Locations.Any(l => l.IsInMetadata)
+            && i.ContainingNamespace?.ToDisplayString() is not ("System" or null)
+            && !i.ContainingNamespace.ToDisplayString().StartsWith("System.Collections")
+        );
+    }
+
 
     private static bool IsEntryPoint(ISymbol symbol)
     {

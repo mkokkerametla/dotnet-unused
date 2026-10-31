@@ -7,7 +7,7 @@ A CLI tool for detecting unused code in .NET solutions using Roslyn static analy
 
 ## Features
 
-- Detects unused methods, properties, fields, and using directives
+- Detects unused types (classes, structs, records, interfaces, enums, delegates), methods, properties, fields, and using directives
 - Detects unused NuGet packages
 - Auto-fix support for removing unused usings
 - JSON export for CI/CD integration
@@ -54,6 +54,8 @@ Solutions (`.sln` and `.slnx`) and individual projects (`.csproj`) are all suppo
 | `--fix`               | Automatically remove unused usings                                                                       |
 | `--unused-packages`   | Detect unused NuGet packages                                                                             |
 | `--ignore-attributes` | Comma-separated attribute names whose members are never flagged                                          |
+| `--exclude-packages`  | Comma-separated NuGet package IDs that are never flagged as unused (requires `--unused-packages`)        |
+| `--verbose, -v`       | Explain why each NuGet package was judged used, unused, or skipped (requires `--unused-packages`)        |
 | `--msbuild-path`      | Directory of the MSBuild to use (e.g. a .NET SDK folder). Also settable via `DOTNET_UNUSED_MSBUILD_PATH` |
 | `--fail-on-unused`    | Exit with code 2 when any unused code is found, for CI gating (default: always exit 0 on a successful analysis) |
 | `--strict`            | Treat project load errors as fatal instead of analyzing a partially loaded solution                       |
@@ -86,6 +88,9 @@ dotnet-unused MySolution.sln --unused-packages
 
 # Ignore members marked with specific attributes
 dotnet-unused MySolution.sln --ignore-attributes TestInitialize,SetUp
+
+# Never flag specific packages, and show why each package was judged
+dotnet-unused MySolution.sln --unused-packages --exclude-packages Humanizer,Polly --verbose
 
 # Analyze single project
 dotnet-unused MyProject.csproj

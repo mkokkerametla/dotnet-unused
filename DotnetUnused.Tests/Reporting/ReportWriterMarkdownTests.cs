@@ -1,5 +1,7 @@
 using DotnetUnused.Models;
 using DotnetUnused.Reporting;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace DotnetUnused.Tests.Reporting;
@@ -7,6 +9,37 @@ namespace DotnetUnused.Tests.Reporting;
 [Collection("Console")]
 public class ReportWriterMarkdownTests
 {
+    [Fact]
+    public async Task WriteMarkdownReportAsync_GroupsTypesAndPluralizesKinds()
+    {
+        var tree = CSharpSyntaxTree.ParseText("class Orphan { int Value { get; } }");
+        var compilation = CSharpCompilation.Create(
+            "Test",
+            [tree],
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]
+        );
+        var type = compilation.GetTypeByMetadataName("Orphan")!;
+        var property = type.GetMembers("Value").Single();
+
+        var result = new AnalysisResult();
+        result.AddUnusedSymbol(new SymbolDefinition(type, type.Locations[0]));
+        result.AddUnusedSymbol(new SymbolDefinition(property, property.Locations[0]));
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            await new ReportWriter().WriteMarkdownReportAsync(result, tempFile);
+
+            var md = await File.ReadAllTextAsync(tempFile);
+            Assert.Contains("## Unused Classes (1)", md);
+            Assert.Contains("## Unused Properties (1)", md);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
     [Fact]
     public async Task WriteMarkdownReportAsync_WritesSummaryAndSections()
     {

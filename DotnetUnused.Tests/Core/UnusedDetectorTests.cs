@@ -28,7 +28,9 @@ public class UnusedDetectorTests
         var model = compilation.GetSemanticModel(tree);
         var bag = new ConcurrentBag<SymbolDefinition>();
 
-        foreach (var methodDecl in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>())
+        foreach (
+            var methodDecl in tree.GetRoot().DescendantNodes().OfType<MethodDeclarationSyntax>()
+        )
         {
             var symbol = model.GetDeclaredSymbol(methodDecl);
             if (symbol != null)
