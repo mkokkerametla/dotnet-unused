@@ -198,14 +198,14 @@ public sealed class ReferenceWalker
         {
             // foreach implicitly calls GetEnumerator(), MoveNext(), and the Current
             // property. Record all three explicitly via the semantic model.
-            AddForEachInfo(_semanticModel.GetForEachStatementInfo(node));
+            AddForEachInfo(_semanticModel.GetForEachStatementInfo(node), node);
             base.VisitForEachStatement(node);
         }
 
         public override void VisitForEachVariableStatement(ForEachVariableStatementSyntax node)
         {
             var info = _semanticModel.GetForEachStatementInfo(node);
-            AddForEachInfo(info);
+            AddForEachInfo(info, node);
 
             // foreach (var (a, b) in xs) additionally deconstructs each element.
             var designation = node.DescendantNodes()
@@ -223,7 +223,7 @@ public sealed class ReferenceWalker
                     );
                     if (deconstruct != null)
                     {
-                        AddReference(deconstruct);
+                        AddReference(deconstruct, node);
                     }
                 }
             }
@@ -231,19 +231,19 @@ public sealed class ReferenceWalker
             base.VisitForEachVariableStatement(node);
         }
 
-        private void AddForEachInfo(ForEachStatementInfo info)
+        private void AddForEachInfo(ForEachStatementInfo info, SyntaxNode node)
         {
             if (info.GetEnumeratorMethod != null)
             {
-                AddReference(info.GetEnumeratorMethod);
+                AddReference(info.GetEnumeratorMethod, node);
             }
             if (info.MoveNextMethod != null)
             {
-                AddReference(info.MoveNextMethod);
+                AddReference(info.MoveNextMethod, node);
             }
             if (info.CurrentProperty != null)
             {
-                AddReference(info.CurrentProperty);
+                AddReference(info.CurrentProperty, node);
             }
         }
 
@@ -259,7 +259,7 @@ public sealed class ReferenceWalker
             var method = FindMethod(type, methodName, 0);
             if (method != null)
             {
-                AddReference(method);
+                AddReference(method, expression);
             }
         }
 
@@ -274,7 +274,7 @@ public sealed class ReferenceWalker
             var method = FindMethod(type, "Deconstruct", arity);
             if (method != null)
             {
-                AddReference(method);
+                AddReference(method, expression);
             }
         }
 
@@ -320,18 +320,58 @@ public sealed class ReferenceWalker
             var symbol = symbolInfo.Symbol;
             if (symbol != null)
             {
-                AddReference(symbol);
+                AddReference(symbol, node);
             }
 
             // Also check candidate symbols (for overload resolution)
             foreach (var candidate in symbolInfo.CandidateSymbols)
             {
-                AddReference(candidate);
+                AddReference(candidate, node);
             }
         }
 
-        private void AddReference(ISymbol symbol)
+        /// <summary>
+        /// Records a reference to a type, unless the reference sits inside that type's own
+        /// declaration. A type that only refers to itself (recursion, factory methods) is
+        /// still unused.
+        /// </summary>
+        private void AddTypeReference(INamedTypeSymbol type, SyntaxNode node)
         {
+            // Constructed generics (List<int>) map back to their definition (List<T>)
+            var definition = type.OriginalDefinition;
+
+            foreach (var ancestor in node.Ancestors())
+            {
+                if (ancestor is not (BaseTypeDeclarationSyntax or DelegateDeclarationSyntax))
+                {
+                    continue;
+                }
+
+                var enclosing = _semanticModel.GetDeclaredSymbol(ancestor, _cancellationToken);
+                if (SymbolEqualityComparer.Default.Equals(enclosing, definition))
+                {
+                    return;
+                }
+            }
+
+            _references.Add(definition);
+        }
+
+        private void AddReference(ISymbol symbol, SyntaxNode node)
+        {
+            // Using a member (or constructing an instance) counts as using its type, so a type
+            // that is only reached through its members is not reported as unused.
+            if (symbol.Kind != SymbolKind.NamedType && symbol.ContainingType is { } owner)
+            {
+                AddTypeReference(owner, node);
+            }
+
+            if (symbol is INamedTypeSymbol namedType)
+            {
+                AddTypeReference(namedType, node);
+                return;
+            }
+
             // Unwrap property accessors to their containing property
             if (
                 symbol is IMethodSymbol method
@@ -342,6 +382,13 @@ public sealed class ReferenceWalker
             )
             {
                 symbol = method.AssociatedSymbol ?? symbol;
+            }
+
+            // An extension method called as x.Ext() resolves to a reduced form; map it back to
+            // the method that was declared
+            if (symbol is IMethodSymbol { ReducedFrom: { } reducedFrom })
+            {
+                symbol = reducedFrom;
             }
 
             // Normalize constructed symbols to their definitions so they match

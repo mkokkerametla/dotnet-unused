@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Unused type detection**: classes, structs, records, interfaces, enums and delegates that nothing references are now reported. Public types follow `--exclude-public`; test classes, types with an entry point, and types derived from or implementing framework types are never reported
+- **`--exclude-packages` option** to keep named NuGet packages from being reported as unused
+- **`--verbose` / `-v` option** to explain why each NuGet package was judged used, unused, or skipped
 - **`--fail-on-unused` option** - exit with code 2 when any unused code is found, for CI gating (previously the tool always exited 0 on a successful analysis)
 - **`--strict` option** - treat project load errors as fatal instead of analyzing a partially loaded solution
 - **`--include-virtual` option** - also report unused virtual members (virtuals remain skipped by default)
@@ -21,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Implicit calls are now tracked** - `using` / `await using` (`Dispose` / `DisposeAsync`), `foreach` (`GetEnumerator` / `MoveNext` / `Current`), and deconstruction (`Deconstruct`) no longer look like unused members
 - **"Unused Propertys" heading typo** in the console report
 - **Argument parser hardening** - unknown flags and invalid `--format` values are now errors instead of being silently ignored; `--help` works in any position
-
+- Extension methods called as `x.Ext()` are no longer reported as unused
+- A declaration in a multi-targeted project is reported once instead of once per target framework
 
 ## [1.3.1] - 2026-10-20
 

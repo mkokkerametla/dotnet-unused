@@ -369,4 +369,86 @@ public class UnusedPackageDetectorTests
         // Assert - case-insensitive matching
         Assert.Empty(unused);
     }
+
+    [Fact]
+    public void DetectUnused_SkipsExcludedPackages_CaseInsensitive()
+    {
+        var detector = new UnusedPackageDetector(new[] { "serilog" });
+        var packages = new List<PackageReferenceInfo>
+        {
+            new()
+            {
+                PackageId = "Serilog",
+                Version = "3.1.1",
+                ProjectName = "Test",
+                ProjectPath = "Test.csproj"
+            }
+        };
+
+        var unused = detector.DetectUnused(packages, new HashSet<string>());
+
+        Assert.Empty(unused);
+    }
+
+    [Fact]
+    public void DetectUnused_ReportsDecisionsToVerboseProgress()
+    {
+        var messages = new List<string>();
+        var detector = new UnusedPackageDetector(
+            new[] { "Moq" },
+            new SynchronousProgress(messages.Add)
+        );
+        var packages = new List<PackageReferenceInfo>
+        {
+            new()
+            {
+                PackageId = "Serilog",
+                Version = "3.1.1",
+                ProjectName = "Test",
+                ProjectPath = "Test.csproj"
+            },
+            new()
+            {
+                PackageId = "Moq",
+                Version = "4.20.0",
+                ProjectName = "Test",
+                ProjectPath = "Test.csproj"
+            }
+        };
+
+        detector.DetectUnused(packages, new HashSet<string>());
+
+        Assert.Contains(messages, m => m.StartsWith("Serilog (Test): unused"));
+        Assert.Contains(messages, m => m.StartsWith("Skipping Moq: excluded"));
+    }
+
+    [Fact]
+    public void DetectUnused_ReportsExclusion_WhenExcludedPackageHasNoCompileAssets()
+    {
+        var messages = new List<string>();
+        var detector = new UnusedPackageDetector(
+            new[] { "Foo" },
+            new SynchronousProgress(messages.Add)
+        );
+        var packages = new List<PackageReferenceInfo>
+        {
+            new()
+            {
+                PackageId = "Foo",
+                Version = "1.0.0",
+                ProjectName = "Test",
+                ProjectPath = "Test.csproj",
+                IncludesCompileAssets = false
+            }
+        };
+
+        detector.DetectUnused(packages, new HashSet<string>());
+
+        Assert.Contains(messages, m => m == "Skipping Foo: excluded by --exclude-packages");
+    }
+
+    private sealed class SynchronousProgress(Action<string> report) : IProgress<string>
+    {
+        public void Report(string value) => report(value);
+    }
 }
