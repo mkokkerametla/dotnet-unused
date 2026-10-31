@@ -12,7 +12,16 @@ export interface UnusedCodeReport {
 }
 
 export interface UnusedSymbol {
-  kind: "Method" | "Property" | "Field";
+  kind:
+    | "Method"
+    | "Property"
+    | "Field"
+    | "Class"
+    | "Struct"
+    | "Record"
+    | "Interface"
+    | "Enum"
+    | "Delegate";
   fullyQualifiedName: string;
   filePath: string;
   lineNumber: number;
@@ -30,3 +39,6 @@ export interface AnalysisOptions {
   excludePublic: boolean;
   targetPath: string;
 }
+
+/** Report formats the CLI writes with --format */
+export type ReportFormat = "json" | "markdown";

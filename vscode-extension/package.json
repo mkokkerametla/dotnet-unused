@@ -48,7 +48,7 @@
       },
       {
         "command": "dotnet-unused.exportReport",
-        "title": "Export Unused Code Report (JSON)",
+        "title": "Export Unused Code Report",
         "category": "Dotnet Unused"
       },
       {

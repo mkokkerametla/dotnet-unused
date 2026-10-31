@@ -4,7 +4,7 @@ import * as fs from "fs";
 import { CliRunner } from "./cliRunner";
 import { DiagnosticProvider } from "./diagnosticProvider";
 import { UnusedSymbolsProvider } from "./unusedSymbolsProvider";
-import { UnusedCodeReport } from "./types";
+import { ReportFormat, UnusedCodeReport } from "./types";
 
 let outputChannel: vscode.OutputChannel;
 let cliRunner: CliRunner;
@@ -152,24 +152,7 @@ async function runAnalysisInTerminal(
   targetPath: string,
   scope: "workspace" | "file",
 ) {
-  // Check if CLI is available first
-  const available = await cliRunner.checkCliAvailable();
-  if (!available) {
-    const action = await vscode.window.showErrorMessage(
-      "dotnet-unused CLI tool not found. Install it to use this feature.",
-      "Install Automatically",
-      "Manual Instructions",
-    );
-
-    if (action === "Install Automatically") {
-      await vscode.commands.executeCommand("dotnet-unused.installCli");
-    } else if (action === "Manual Instructions") {
-      vscode.env.openExternal(
-        vscode.Uri.parse(
-          "https://github.com/kokkerametla/dotnet-unused#installation",
-        ),
-      );
-    }
+  if (!(await ensureCliAvailable())) {
     return;
   }
 
@@ -257,7 +240,7 @@ async function selectProjectOrSolution(action: string): Promise<string | null> {
   }
 
   const slnFiles = await vscode.workspace.findFiles(
-    "**/*.sln",
+    "**/*.{sln,slnx}",
     "**/node_modules/**",
     10,
   );
@@ -324,10 +307,120 @@ async function findProjectFile(filePath: string): Promise<string | null> {
   return null;
 }
 
-async function exportReport() {
-  vscode.window.showInformationMessage(
-    "Export report functionality coming soon!",
+/**
+ * Checks for the CLI and, when it is missing, offers to install it.
+ * Returns true when the CLI can be used.
+ */
+async function ensureCliAvailable(): Promise<boolean> {
+  if (await cliRunner.checkCliAvailable()) {
+    return true;
+  }
+
+  const action = await vscode.window.showErrorMessage(
+    "dotnet-unused CLI tool not found. Install it to use this feature.",
+    "Install Automatically",
+    "Manual Instructions",
   );
+
+  if (action === "Install Automatically") {
+    await vscode.commands.executeCommand("dotnet-unused.installCli");
+  } else if (action === "Manual Instructions") {
+    vscode.env.openExternal(
+      vscode.Uri.parse(
+        "https://github.com/kokkerametla/dotnet-unused#installation",
+      ),
+    );
+  }
+  return false;
+}
+
+async function exportReport() {
+  if (!(await ensureCliAvailable())) {
+    return;
+  }
+
+  const targetPath = await selectProjectOrSolution("export");
+  if (!targetPath) {
+    return;
+  }
+
+  const formats: (vscode.QuickPickItem & {
+    format: ReportFormat;
+    extension: string;
+    filterName: string;
+  })[] = [
+    {
+      label: "JSON",
+      description: "Machine-readable, for CI and scripts",
+      format: "json",
+      extension: "json",
+      filterName: "JSON",
+    },
+    {
+      label: "Markdown",
+      description: "Readable report for pull requests and sharing",
+      format: "markdown",
+      extension: "md",
+      filterName: "Markdown",
+    },
+  ];
+  const choice = await vscode.window.showQuickPick(formats, {
+    placeHolder: "Select a report format",
+  });
+  if (!choice) {
+    return;
+  }
+
+  const folder =
+    vscode.workspace.getWorkspaceFolder(vscode.Uri.file(targetPath))?.uri
+      .fsPath ?? path.dirname(targetPath);
+  const outputUri = await vscode.window.showSaveDialog({
+    defaultUri: vscode.Uri.file(
+      path.join(folder, `unused-code-report.${choice.extension}`),
+    ),
+    filters: { [choice.filterName]: [choice.extension] },
+    saveLabel: "Export",
+  });
+  if (!outputUri) {
+    return;
+  }
+
+  outputChannel.appendLine(`\n=== Exporting ${choice.label} report ===`);
+  outputChannel.appendLine(`Target: ${targetPath}`);
+
+  try {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Exporting unused code report for ${path.basename(targetPath)}...`,
+        cancellable: false,
+      },
+      () => cliRunner.exportReport(targetPath, choice.format, outputUri.fsPath),
+    );
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    outputChannel.appendLine(`Error: ${errorMessage}`);
+    const action = await vscode.window.showErrorMessage(
+      `Export failed: ${errorMessage}`,
+      "View Output",
+    );
+    if (action === "View Output") {
+      outputChannel.show();
+    }
+    return;
+  }
+
+  const action = await vscode.window.showInformationMessage(
+    `Exported report to ${path.basename(outputUri.fsPath)}`,
+    "Open Report",
+  );
+  if (action === "Open Report") {
+    if (choice.format === "markdown") {
+      await vscode.commands.executeCommand("markdown.showPreview", outputUri);
+    } else {
+      await vscode.window.showTextDocument(outputUri);
+    }
+  }
 }
 
 async function installCli(): Promise<boolean> {
@@ -539,24 +632,7 @@ async function installCli(): Promise<boolean> {
 }
 
 async function fixUnusedUsings() {
-  // Check if CLI is available first
-  const available = await cliRunner.checkCliAvailable();
-  if (!available) {
-    const action = await vscode.window.showErrorMessage(
-      "dotnet-unused CLI tool not found. Install it to use this feature.",
-      "Install Automatically",
-      "Manual Instructions",
-    );
-
-    if (action === "Install Automatically") {
-      await vscode.commands.executeCommand("dotnet-unused.installCli");
-    } else if (action === "Manual Instructions") {
-      vscode.env.openExternal(
-        vscode.Uri.parse(
-          "https://github.com/kokkerametla/dotnet-unused#installation",
-        ),
-      );
-    }
+  if (!(await ensureCliAvailable())) {
     return;
   }
 
