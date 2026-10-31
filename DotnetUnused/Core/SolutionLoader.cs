@@ -19,6 +19,15 @@ public sealed class SolutionLoader
 
     private readonly string? _msbuildPath;
 
+    /// <summary>
+    /// Workspace error diagnostics seen while loading the solution or project.
+    /// Populated by <see cref="LoadAsync"/>. A non-empty list means the analysis
+    /// ran over a partially loaded compilation, so results may be incomplete;
+    /// callers surface this prominently and can treat it as fatal with
+    /// <c>--strict</c>.
+    /// </summary>
+    public List<string> LoadErrors { get; } = new();
+
     public SolutionLoader(string? msbuildPath = null)
     {
         _msbuildPath = msbuildPath;
@@ -115,7 +124,9 @@ public sealed class SolutionLoader
 
         var workspace = MSBuildWorkspace.Create();
 
-        // Subscribe to workspace failures using the recommended API
+        // Subscribe to workspace failures using the recommended API.
+        // Errors are collected (not just reported) so the caller can decide
+        // whether a partially loaded solution is acceptable.
         workspace.RegisterWorkspaceFailedHandler(args =>
         {
             if (args.Diagnostic.Kind == WorkspaceDiagnosticKind.Warning)
@@ -124,6 +135,7 @@ public sealed class SolutionLoader
             }
             else
             {
+                LoadErrors.Add(args.Diagnostic.Message);
                 progress?.Report($"Error: {args.Diagnostic.Message}");
             }
         });
@@ -154,7 +166,6 @@ public sealed class SolutionLoader
                     $"Unsupported file type: {path}. Expected .sln, .slnx, or .csproj"
                 );
             }
-
         }
         catch (Exception ex) when (ex is not (OperationCanceledException or ArgumentException))
         {

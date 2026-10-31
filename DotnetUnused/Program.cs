@@ -20,7 +20,7 @@ public class Program
         try
         {
             // Parse command line arguments
-            if (args.Length == 0 || args[0] == "--help" || args[0] == "-h")
+            if (args.Length == 0 || args.Contains("--help") || args.Contains("-h"))
             {
                 ShowHelp();
                 return 0;
@@ -33,38 +33,41 @@ public class Program
             var skipUsings = false;
             var fixUsings = false;
             var unusedPackages = false;
+            var failOnUnused = false;
+            var strict = false;
+            var includeVirtual = false;
             var ignoreAttributes = new List<string>();
             string? msbuildPath = null;
 
-            // Parse options
+            // Parse options. Unknown flags and missing/invalid values are errors:
+            // silently ignoring them used to produce confusing runs (e.g. a typo
+            // in --format quietly falling back to text output).
             for (int i = 1; i < args.Length; i++)
             {
+                string Value(string option)
+                {
+                    if (i + 1 >= args.Length)
+                    {
+                        throw new ArgumentException($"Missing value for {option}.");
+                    }
+                    return args[++i];
+                }
+
                 switch (args[i])
                 {
-                    case "--format"
-                    or "-f":
-                        if (i + 1 < args.Length)
-                        {
-                            format = args[++i];
-                        }
+                    case "--format" or "-f":
+                        format = Value(args[i]);
                         break;
-                    case "--output"
-                    or "-o":
-                        if (i + 1 < args.Length)
-                        {
-                            outputPath = args[++i];
-                        }
+                    case "--output" or "-o":
+                        outputPath = Value(args[i]);
                         break;
                     case "--exclude-public":
-                        if (i + 1 < args.Length)
+                        if (!bool.TryParse(Value(args[i]), out excludePublic))
                         {
-                            if (!bool.TryParse(args[++i], out excludePublic))
-                            {
-                                AnsiConsole.MarkupLine(
-                                    "[red]Invalid value for --exclude-public. Expected 'true' or 'false'.[/]"
-                                );
-                                return 1;
-                            }
+                            AnsiConsole.MarkupLine(
+                                "[red]Invalid value for --exclude-public. Expected 'true' or 'false'.[/]"
+                            );
+                            return 1;
                         }
                         break;
                     case "--skip-usings":
@@ -76,29 +79,52 @@ public class Program
                     case "--unused-packages":
                         unusedPackages = true;
                         break;
+                    case "--fail-on-unused":
+                        failOnUnused = true;
+                        break;
+                    case "--strict":
+                        strict = true;
+                        break;
+                    case "--include-virtual":
+                        includeVirtual = true;
+                        break;
                     case "--msbuild-path":
-                        if (i + 1 < args.Length)
-                        {
-                            msbuildPath = args[++i];
-                        }
+                        msbuildPath = Value(args[i]);
                         break;
                     case "--ignore-attributes":
-                        if (i + 1 < args.Length)
-                        {
-                            ignoreAttributes.AddRange(
-                                args[++i]
-                                    .Split(
-                                        ',',
-                                        StringSplitOptions.RemoveEmptyEntries
-                                            | StringSplitOptions.TrimEntries
-                                    )
-                            );
-                        }
+                        ignoreAttributes.AddRange(
+                            Value(args[i])
+                                .Split(
+                                    ',',
+                                    StringSplitOptions.RemoveEmptyEntries
+                                        | StringSplitOptions.TrimEntries
+                                )
+                        );
                         break;
+                    default:
+                        AnsiConsole.MarkupLine(
+                            $"[red]Unknown argument: {Markup.Escape(args[i])}. Run with --help to see supported options.[/]"
+                        );
+                        return 1;
                 }
             }
 
-            await ScanAsync(
+            if (format.ToLowerInvariant() is not ("text" or "json" or "markdown" or "md"))
+            {
+                AnsiConsole.MarkupLine(
+                    $"[red]Invalid value for --format: '{Markup.Escape(format)}'. Expected 'text', 'json', or 'markdown'.[/]"
+                );
+                return 1;
+            }
+
+            if (outputPath != null && format.ToLowerInvariant() == "text")
+            {
+                AnsiConsole.MarkupLine(
+                    "[yellow]Warning: --output is only used with --format json or markdown; ignoring it for text output.[/]"
+                );
+            }
+
+            var result = await ScanAsync(
                 path,
                 format,
                 outputPath,
@@ -108,8 +134,30 @@ public class Program
                 unusedPackages,
                 ignoreAttributes,
                 msbuildPath,
+                strict,
+                includeVirtual,
                 cts.Token
             );
+
+            // CI gating: by default the tool always exits 0 on a successful
+            // analysis, even when findings exist. --fail-on-unused opts into a
+            // non-zero exit code so a build can fail on unused code. Exit code 2
+            // (distinct from 1 = error) means "analysis succeeded, findings found".
+            if (
+                failOnUnused
+                && (
+                    result.UnusedSymbols.Count > 0
+                    || result.UnusedUsings.Count > 0
+                    || result.UnusedPackages.Count > 0
+                )
+            )
+            {
+                AnsiConsole.MarkupLine(
+                    "[red]Failing with exit code 2: unused code found (--fail-on-unused).[/]"
+                );
+                return 2;
+            }
+
             return 0;
         }
         catch (OperationCanceledException)
@@ -158,6 +206,15 @@ public class Program
             "  [cyan]--unused-packages[/]  Detect unused NuGet packages (default: false)"
         );
         AnsiConsole.MarkupLine(
+            "  [cyan]--fail-on-unused[/]  Exit with code 2 when any unused code is found (for CI gating; default: exit 0)"
+        );
+        AnsiConsole.MarkupLine(
+            "  [cyan]--strict[/]          Treat project load errors as fatal instead of analyzing a partially loaded solution (default: false)"
+        );
+        AnsiConsole.MarkupLine(
+            "  [cyan]--include-virtual[/]  Also report unused virtual members (default: false; virtuals are skipped because polymorphism can hide their uses)"
+        );
+        AnsiConsole.MarkupLine(
             "  [cyan]--ignore-attributes[/]  Never flag members with these attributes (comma-separated)"
         );
         AnsiConsole.MarkupLine(
@@ -182,7 +239,7 @@ public class Program
         );
     }
 
-    private static async Task ScanAsync(
+    private static async Task<DotnetUnused.Models.AnalysisResult> ScanAsync(
         string path,
         string format,
         string? outputPath,
@@ -192,6 +249,8 @@ public class Program
         bool unusedPackages,
         List<string> ignoreAttributes,
         string? msbuildPath,
+        bool strict,
+        bool includeVirtual,
         CancellationToken cancellationToken = default
     )
     {
@@ -209,9 +268,29 @@ public class Program
         var loader = new SolutionLoader(msbuildPath);
         var solution = await loader.LoadAsync(path, progress, cancellationToken);
 
+        // A partially loaded solution produces silently incomplete results
+        // (missing projects look like unused code, and vice versa). Surface
+        // load errors prominently; --strict makes them fatal.
+        if (loader.LoadErrors.Count > 0)
+        {
+            AnsiConsole.MarkupLine(
+                $"[yellow]Warning: {loader.LoadErrors.Count} project load error(s) — results may be incomplete:[/]"
+            );
+            foreach (var loadError in loader.LoadErrors)
+            {
+                AnsiConsole.MarkupLine($"[yellow]  - {Markup.Escape(loadError)}[/]");
+            }
+            if (strict)
+            {
+                throw new InvalidOperationException(
+                    "Aborting due to project load errors (--strict)."
+                );
+            }
+        }
+
         // Index declared symbols
         cancellationToken.ThrowIfCancellationRequested();
-        var indexer = new SymbolIndexer();
+        var indexer = new SymbolIndexer(includeVirtual);
         var declaredSymbols = await indexer.CollectDeclaredSymbolsAsync(
             solution,
             progress,
@@ -274,10 +353,18 @@ public class Program
         {
             cancellationToken.ThrowIfCancellationRequested();
             var packageAnalyzer = new UnusedPackageAnalyzer();
+            // Assemblies behind referenced symbols let the package detector
+            // recognize a package even when its namespaces don't follow its
+            // package ID (the namespace-guessing heuristic alone misses those).
+            var usedAssemblyNames = new HashSet<string>(
+                referencedSymbols.Select(s => s.ContainingAssembly?.Name).Where(n => n != null)!,
+                StringComparer.OrdinalIgnoreCase
+            );
             var packageResults = await packageAnalyzer.AnalyzeAsync(
                 solution,
                 progress,
-                cancellationToken
+                cancellationToken,
+                usedAssemblyNames
             );
 
             result.TotalPackagesAnalyzed = packageResults.TotalPackagesAnalyzed;
@@ -299,8 +386,7 @@ public class Program
                 var jsonPath = outputPath ?? "unused-code-report.json";
                 await reporter.WriteJsonReportAsync(result, jsonPath);
                 break;
-            case "markdown"
-            or "md":
+            case "markdown" or "md":
                 var mdPath = outputPath ?? "unused-code-report.md";
                 await reporter.WriteMarkdownReportAsync(result, mdPath);
                 break;
@@ -308,5 +394,7 @@ public class Program
                 reporter.WriteConsoleReport(result);
                 break;
         }
+
+        return result;
     }
 }

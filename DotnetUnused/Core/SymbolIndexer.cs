@@ -10,6 +10,19 @@ namespace DotnetUnused.Core;
 /// </summary>
 public sealed class SymbolIndexer
 {
+    private readonly bool _includeVirtual;
+
+    /// <param name="includeVirtual">
+    /// When false (default), virtual members are never indexed: a virtual method
+    /// may be reached through polymorphism that the reference walker cannot see,
+    /// so reporting it risks false positives. Pass true to also analyze virtual
+    /// members, accepting that risk.
+    /// </param>
+    public SymbolIndexer(bool includeVirtual = false)
+    {
+        _includeVirtual = includeVirtual;
+    }
+
     /// <summary>
     /// Collects all declared symbols from the solution
     /// </summary>
@@ -100,7 +113,7 @@ public sealed class SymbolIndexer
     /// <summary>
     /// Determines if a symbol should be indexed for analysis
     /// </summary>
-    private static bool ShouldIndexSymbol(ISymbol? symbol)
+    private bool ShouldIndexSymbol(ISymbol? symbol)
     {
         if (symbol == null)
         {
@@ -134,8 +147,8 @@ public sealed class SymbolIndexer
             return false;
         }
 
-        // Skip virtual members (might be overridden)
-        if (symbol.IsVirtual)
+        // Skip virtual members (might be overridden) unless opted in
+        if (symbol.IsVirtual && !_includeVirtual)
         {
             return false;
         }

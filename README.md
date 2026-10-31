@@ -55,6 +55,9 @@ Solutions (`.sln` and `.slnx`) and individual projects (`.csproj`) are all suppo
 | `--unused-packages`   | Detect unused NuGet packages                                                                             |
 | `--ignore-attributes` | Comma-separated attribute names whose members are never flagged                                          |
 | `--msbuild-path`      | Directory of the MSBuild to use (e.g. a .NET SDK folder). Also settable via `DOTNET_UNUSED_MSBUILD_PATH` |
+| `--fail-on-unused`    | Exit with code 2 when any unused code is found, for CI gating (default: always exit 0 on a successful analysis) |
+| `--strict`            | Treat project load errors as fatal instead of analyzing a partially loaded solution                       |
+| `--include-virtual`   | Also report unused virtual members (default: virtuals are skipped, since polymorphism can hide their uses) |
 | `--help, -h`          | Show command help                                                                                        |
 
 ### Examples
@@ -86,11 +89,24 @@ dotnet-unused MySolution.sln --ignore-attributes TestInitialize,SetUp
 
 # Analyze single project
 dotnet-unused MyProject.csproj
+
+# Fail the build when unused code is found (CI gating)
+dotnet-unused MySolution.sln --fail-on-unused
 ```
 
 ## VS Code Extension
 
 Install "Dotnet Unused" from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=kokkerametla.dotnet-unused-vscode) for inline diagnostics and one-click fixes.
+
+## Known limitations
+
+- **Reflection and `dynamic`:** members reached only via reflection or dynamic dispatch are invisible to static analysis and may be flagged. Protect them with `--ignore-attributes`, or mark them `[UsedImplicitly]` / `[Preserve]`.
+- **Solution scope:** analysis covers the solution or project you pass in. Members used only by code outside it (for example, a library consumed by another solution) will be flagged — keep `--exclude-public` (the default) for libraries.
+- **Only `.cs` files are analyzed.** Razor, XAML, and CSHTML bindings are not tracked; XAML event handlers are spared by a name-based heuristic instead, which can also spare a genuinely unused helper with an event-handler-like name.
+- **Virtual members** are skipped by default (see `--include-virtual`).
+- **Generated files are excluded** (`.g.cs`, `.Designer.cs`, EF Core migrations).
+- **Unused packages** are detected by combining namespace usage with the assemblies recorded in the restore assets file. A package used only through MSBuild targets, content files, or other non-code means may still be flagged — review before removing.
+- **Interface implementations** count as used when their interface member is referenced anywhere in the solution; an implementation whose interface member is never referenced is still flagged.
 
 ## Requirements
 
