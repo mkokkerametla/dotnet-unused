@@ -150,13 +150,19 @@ public sealed class SolutionLoader
             )
             {
                 progress?.Report($"Loading solution: {path}");
-                solution = await workspace.OpenSolutionAsync(path);
+                solution = await workspace.OpenSolutionAsync(
+                    path,
+                    cancellationToken: cancellationToken
+                );
                 progress?.Report($"Loaded solution with {solution.ProjectIds.Count} projects");
             }
             else if (path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
             {
                 progress?.Report($"Loading project: {path}");
-                var project = await workspace.OpenProjectAsync(path);
+                var project = await workspace.OpenProjectAsync(
+                    path,
+                    cancellationToken: cancellationToken
+                );
                 solution = project.Solution;
                 progress?.Report($"Loaded project: {project.Name}");
             }

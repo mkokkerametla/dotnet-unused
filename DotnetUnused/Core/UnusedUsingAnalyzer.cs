@@ -20,7 +20,7 @@ public sealed class UnusedUsingAnalyzer
         CancellationToken cancellationToken = default
     )
     {
-        var results = new ConcurrentBag<UsingDirectiveInfo>();
+        var results = new ConcurrentBag<(ProjectId Project, UsingDirectiveInfo Using)>();
         var projects = solution.Projects.ToList();
 
         progress?.Report($"Analyzing unused usings in {projects.Count} projects...");
@@ -104,13 +104,16 @@ public sealed class UnusedUsingAnalyzer
                         }
 
                         results.Add(
-                            new UsingDirectiveInfo
-                            {
-                                FilePath = filePath,
-                                LineNumber = lineSpan.StartLinePosition.Line + 1,
-                                Namespace = ExtractNamespaceFromDiagnostic(diagnostic),
-                                Message = diagnostic.GetMessage()
-                            }
+                            (
+                                project.Id,
+                                new UsingDirectiveInfo
+                                {
+                                    FilePath = filePath,
+                                    LineNumber = lineSpan.StartLinePosition.Line + 1,
+                                    Namespace = ExtractNamespaceFromDiagnostic(diagnostic),
+                                    Message = diagnostic.GetMessage()
+                                }
+                            )
                         );
                     }
                 }
@@ -124,8 +127,42 @@ public sealed class UnusedUsingAnalyzer
             }
         );
 
-        progress?.Report($"Found {results.Count} unused using directives");
-        return results.OrderBy(u => u.FilePath).ThenBy(u => u.LineNumber).ToList();
+        var unused = KeepUnusedInEveryProject(projects, results);
+        progress?.Report($"Found {unused.Count} unused using directives");
+        return unused;
+    }
+
+    /// <summary>
+    /// A file compiled by several projects (a multi-targeted project is loaded once per target
+    /// framework; a linked file belongs to several projects) can need a directive in only some
+    /// of them, e.g. one used only inside <c>#if NET10_0_OR_GREATER</c>. Only a directive that
+    /// every project compiling the file reports as unused can be removed without breaking a
+    /// build. A project whose analysis failed reports nothing, so its files keep their usings.
+    /// </summary>
+    private static List<UsingDirectiveInfo> KeepUnusedInEveryProject(
+        IEnumerable<Project> projects,
+        IEnumerable<(ProjectId Project, UsingDirectiveInfo Using)> results
+    )
+    {
+        var projectsPerFile = projects
+            .Where(p => p.SupportsCompilation)
+            .SelectMany(p =>
+                p.Documents.Where(d => d.FilePath != null).Select(d => (d.FilePath!, p.Id))
+            )
+            .Distinct()
+            .GroupBy(x => x.Item1, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        return results
+            .GroupBy(r => (r.Using.FilePath, r.Using.LineNumber))
+            .Where(g =>
+                g.Select(r => r.Project).Distinct().Count()
+                >= projectsPerFile.GetValueOrDefault(g.Key.FilePath, 1)
+            )
+            .Select(g => g.First().Using)
+            .OrderBy(u => u.FilePath)
+            .ThenBy(u => u.LineNumber)
+            .ToList();
     }
 
     /// <summary>
