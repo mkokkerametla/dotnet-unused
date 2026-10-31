@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-31
+
 ### Added
 
 - **Unused type detection**: classes, structs, records, interfaces, enums and delegates that nothing references are now reported. Public types follow `--exclude-public`; test classes, types with an entry point, and types derived from or implementing framework types are never reported (custom exception and attribute types still are)
