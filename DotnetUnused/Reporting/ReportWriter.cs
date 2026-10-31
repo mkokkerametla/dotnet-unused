@@ -57,13 +57,13 @@ public sealed class ReportWriter
         }
 
         // Group by symbol kind
-        var grouped = result.UnusedSymbols.GroupBy(s => s.Kind).OrderBy(g => g.Key.ToString());
+        var grouped = result.UnusedSymbols.GroupBy(s => s.DisplayKind).OrderBy(g => g.Key);
 
         foreach (var group in grouped)
         {
             AnsiConsole.WriteLine();
             AnsiConsole.Write(
-                new Rule($"[cyan]Unused {group.Key}s ({group.Count()})[/]")
+                new Rule($"[cyan]Unused {Pluralize(group.Key)} ({group.Count()})[/]")
                     .RuleStyle("grey")
                     .LeftJustified()
             );
@@ -180,7 +180,7 @@ public sealed class ReportWriter
             UnusedSymbols = result
                 .UnusedSymbols.Select(s => new
                 {
-                    Kind = s.Kind.ToString(),
+                    Kind = s.DisplayKind,
                     s.FullyQualifiedName,
                     s.FilePath,
                     s.LineNumber
@@ -267,10 +267,10 @@ public sealed class ReportWriter
         }
 
         // Unused symbols grouped by kind
-        var grouped = result.UnusedSymbols.GroupBy(s => s.Kind).OrderBy(g => g.Key.ToString());
+        var grouped = result.UnusedSymbols.GroupBy(s => s.DisplayKind).OrderBy(g => g.Key);
         foreach (var group in grouped)
         {
-            sb.AppendLine($"## Unused {group.Key}s ({group.Count()})");
+            sb.AppendLine($"## Unused {Pluralize(group.Key)} ({group.Count()})");
             sb.AppendLine();
             sb.AppendLine("| Name | Location |");
             sb.AppendLine("| ---- | -------- |");
@@ -334,6 +334,14 @@ public sealed class ReportWriter
     /// <summary>
     /// Escapes characters that would break Markdown table cells
     /// </summary>
+    private static string Pluralize(string kind) =>
+        kind switch
+        {
+            "Property" => "Properties",
+            "Class" => "Classes",
+            _ => kind + "s"
+        };
+
     private static string EscapeMarkdown(string value) =>
         value.Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
 }
