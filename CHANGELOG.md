@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **MCP server** (`dotnet-unused mcp`) - runs a Model Context Protocol server over stdio with two tools: `analyze_solution` (read-only, structured results) and `fix_unused_usings` (annotated as destructive so clients ask before running it). See the README for Claude Code, VS Code and Cursor setup
+
+### Fixed
+
+- **Unused usings in multi-targeted projects** - a using directive is now reported (and removed by `--fix`) only when every target framework compiling the file finds it unused. Previously a directive needed only under `#if` for one framework was removed, breaking that framework's build, and directives were listed once per target framework
+
 ## [1.4.0] - 2026-10-31
 
 ### Added

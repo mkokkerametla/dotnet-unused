@@ -11,6 +11,11 @@ namespace DotnetUnused.Core;
 public sealed class UsingDirectiveFixer
 {
     /// <summary>
+    /// Files rewritten by the last <see cref="ApplyFixesAsync"/> call
+    /// </summary>
+    public List<string> ModifiedFiles { get; } = new();
+
+    /// <summary>
     /// Removes unused using directives from files
     /// </summary>
     public async Task<int> ApplyFixesAsync(
@@ -20,6 +25,8 @@ public sealed class UsingDirectiveFixer
         CancellationToken cancellationToken = default
     )
     {
+        ModifiedFiles.Clear();
+
         if (unusedUsings.Count == 0)
         {
             return 0;
@@ -103,6 +110,7 @@ public sealed class UsingDirectiveFixer
                 await WriteFileAtomicallyAsync(filePath, newText, cancellationToken);
 
                 filesModified++;
+                ModifiedFiles.Add(filePath);
                 usingsRemoved += usingsToRemove.Count;
 
                 progress?.Report(

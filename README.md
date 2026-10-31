@@ -11,6 +11,7 @@ A CLI tool for detecting unused code in .NET solutions using Roslyn static analy
 - Detects unused NuGet packages
 - Auto-fix support for removing unused usings
 - JSON export for CI/CD integration
+- MCP server so AI agents (Claude Code, GitHub Copilot, Cursor) can find and clean up unused code
 - Works with .NET Core, .NET 5+, and .NET Framework
 
 ## Installation
@@ -98,6 +99,49 @@ dotnet-unused MyProject.csproj
 # Fail the build when unused code is found (CI gating)
 dotnet-unused MySolution.sln --fail-on-unused
 ```
+
+## MCP server (AI agents)
+
+`dotnet-unused mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so coding agents can call the analyzer as a tool and get structured JSON back instead of parsing console output.
+
+| Tool                | What it does                                                                                                                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `analyze_solution`  | Read-only. Reports unused symbols, usings and (optionally) NuGet packages, with file and line for each. Accepts a `.sln`, `.slnx` or `.csproj` path, or a directory containing one |
+| `fix_unused_usings` | Removes unused using directives from files on disk, optionally limited to given files. Marked destructive, so clients ask before running it                                        |
+
+A typical session: the agent analyzes the solution, removes the unused usings once you approve, then analyzes again to confirm they are gone. Unused types and members are reported for you to review rather than deleted automatically.
+
+**Claude Code**
+
+```bash
+claude mcp add dotnet-unused -- dotnet-unused mcp
+```
+
+**VS Code (GitHub Copilot)**, in `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "dotnet-unused": {
+      "type": "stdio",
+      "command": "dotnet-unused",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Cursor and other clients**, in the client's MCP config (for Cursor, `.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "dotnet-unused": { "command": "dotnet-unused", "args": ["mcp"] }
+  }
+}
+```
+
+To pick the MSBuild used for loading projects, add `"--msbuild-path", "<dir>"` to `args` or set `DOTNET_UNUSED_MSBUILD_PATH`.
 
 ## VS Code Extension
 

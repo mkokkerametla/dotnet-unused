@@ -9,6 +9,13 @@ public class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        // MCP server mode owns stdout for the protocol, so it must start before anything below
+        // writes to the console. The host handles Ctrl+C and SIGTERM itself.
+        if (args.Length > 0 && args[0] == "mcp")
+        {
+            return await RunMcpServerAsync(args);
+        }
+
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (sender, e) =>
         {
@@ -205,6 +212,9 @@ public class Program
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Usage:[/]");
         AnsiConsole.MarkupLine("  dotnet-unused [[path]] [[options]]");
+        AnsiConsole.MarkupLine(
+            "  dotnet-unused mcp [[--msbuild-path <dir>]]   Run as an MCP server over stdio for AI agents"
+        );
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]Arguments:[/]");
         AnsiConsole.MarkupLine(
@@ -273,6 +283,44 @@ public class Program
         );
     }
 
+    private static async Task<int> RunMcpServerAsync(string[] args)
+    {
+        string? msbuildPath = null;
+        for (int i = 1; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--msbuild-path" when i + 1 < args.Length:
+                    msbuildPath = args[++i];
+                    break;
+                case "--help"
+                or "-h":
+                    Console.Error.WriteLine(
+                        "Usage: dotnet-unused mcp [--msbuild-path <dir>]\n"
+                            + "Runs a Model Context Protocol server over stdio. Configure it in an MCP client as:\n"
+                            + "  { \"command\": \"dotnet-unused\", \"args\": [\"mcp\"] }"
+                    );
+                    return 0;
+                default:
+                    Console.Error.WriteLine(
+                        $"Unknown argument for mcp: {args[i]}. Supported: --msbuild-path <dir>"
+                    );
+                    return 1;
+            }
+        }
+
+        try
+        {
+            await Mcp.McpServerHost.RunAsync(new Mcp.McpServerSettings(msbuildPath));
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            return 1;
+        }
+    }
+
     private static async Task<DotnetUnused.Models.AnalysisResult> ScanAsync(
         string path,
         string format,
@@ -324,89 +372,39 @@ public class Program
             }
         }
 
-        // Index declared symbols
-        cancellationToken.ThrowIfCancellationRequested();
-        var indexer = new SymbolIndexer(includeVirtual);
-        var declaredSymbols = await indexer.CollectDeclaredSymbolsAsync(
+        var result = await SolutionAnalyzer.AnalyzeAsync(
             solution,
+            new AnalysisOptions
+            {
+                ExcludePublic = excludePublic,
+                AnalyzeUsings = !skipUsings,
+                AnalyzePackages = unusedPackages,
+                IncludeVirtual = includeVirtual,
+                IgnoreAttributes = ignoreAttributes,
+                ExcludePackages = excludePackages,
+                PackageDiagnostics = verboseProgress,
+            },
             progress,
             cancellationToken
         );
 
-        // Find referenced symbols
-        cancellationToken.ThrowIfCancellationRequested();
-        var walker = new ReferenceWalker();
-        var referencedSymbols = await walker.CollectReferencedSymbolsAsync(
-            solution,
-            progress,
-            cancellationToken
-        );
-
-        // Detect unused symbols
-        cancellationToken.ThrowIfCancellationRequested();
-        var detector = new UnusedDetector(excludePublic, ignoreAttributes);
-        var result = detector.DetectUnused(declaredSymbols, referencedSymbols, progress);
-
-        // Analyze unused usings (default behavior unless --skip-usings)
-        if (!skipUsings)
+        // Apply fixes if requested
+        if (fixUsings && result.UnusedUsings.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var usingAnalyzer = new UnusedUsingAnalyzer();
-            var unusedUsings = await usingAnalyzer.AnalyzeAsync(
+            progress?.Report($"Removing {result.UnusedUsings.Count} unused usings...");
+
+            var fixer = new UsingDirectiveFixer();
+            var filesModified = await fixer.ApplyFixesAsync(
                 solution,
+                result.UnusedUsings,
                 progress,
                 cancellationToken
             );
 
-            foreach (var unusedUsing in unusedUsings)
+            if (filesModified > 0)
             {
-                result.AddUnusedUsing(unusedUsing);
-            }
-
-            // Apply fixes if requested
-            if (fixUsings && result.UnusedUsings.Count > 0)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                progress?.Report($"Removing {result.UnusedUsings.Count} unused usings...");
-
-                var fixer = new UsingDirectiveFixer();
-                var filesModified = await fixer.ApplyFixesAsync(
-                    solution,
-                    result.UnusedUsings,
-                    progress,
-                    cancellationToken
-                );
-
-                if (filesModified > 0)
-                {
-                    AnsiConsole.MarkupLine($"[green]✓ Modified {filesModified} files[/]");
-                }
-            }
-        }
-
-        // Analyze unused packages (if --unused-packages flag is set)
-        if (unusedPackages)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var packageAnalyzer = new UnusedPackageAnalyzer(excludePackages, verboseProgress);
-            // Assemblies behind referenced symbols let the package detector
-            // recognize a package even when its namespaces don't follow its
-            // package ID (the namespace-guessing heuristic alone misses those).
-            var usedAssemblyNames = new HashSet<string>(
-                referencedSymbols.Select(s => s.ContainingAssembly?.Name).Where(n => n != null)!,
-                StringComparer.OrdinalIgnoreCase
-            );
-            var packageResults = await packageAnalyzer.AnalyzeAsync(
-                solution,
-                progress,
-                cancellationToken,
-                usedAssemblyNames
-            );
-
-            result.TotalPackagesAnalyzed = packageResults.TotalPackagesAnalyzed;
-            foreach (var pkg in packageResults.UnusedPackages)
-            {
-                result.AddUnusedPackage(pkg);
+                AnsiConsole.MarkupLine($"[green]✓ Modified {filesModified} files[/]");
             }
         }
 
@@ -422,7 +420,8 @@ public class Program
                 var jsonPath = outputPath ?? "unused-code-report.json";
                 await reporter.WriteJsonReportAsync(result, jsonPath);
                 break;
-            case "markdown" or "md":
+            case "markdown"
+            or "md":
                 var mdPath = outputPath ?? "unused-code-report.md";
                 await reporter.WriteMarkdownReportAsync(result, mdPath);
                 break;
