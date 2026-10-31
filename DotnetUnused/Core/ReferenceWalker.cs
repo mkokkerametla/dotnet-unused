@@ -128,22 +128,10 @@ public sealed class ReferenceWalker
         public override void VisitAssignmentExpression(AssignmentExpressionSyntax node)
         {
             ProcessNode(node);
-            // Deconstruction assignment: (a, b) = expr; implicitly calls expr.Deconstruct(...).
+            // Deconstruction ((a, b) = expr; var (a, b) = expr;) implicitly calls
+            // expr.Deconstruct(...), which may be an extension method or nested.
             // There is no syntax node for that call, so record it explicitly.
-            if (node.Left is TupleExpressionSyntax tuple)
-            {
-                MarkDeconstructAsReferenced(node.Right, tuple.Arguments.Count);
-            }
-            // Deconstruction declaration: var (a, b) = expr; parses as an
-            // assignment whose left side is a declaration expression carrying
-            // a parenthesized designation (not a local declaration statement).
-            else if (
-                node.Left is DeclarationExpressionSyntax declaration
-                && declaration.Designation is ParenthesizedVariableDesignationSyntax designation
-            )
-            {
-                MarkDeconstructAsReferenced(node.Right, designation.Variables.Count);
-            }
+            AddDeconstructionInfo(_semanticModel.GetDeconstructionInfo(node), node);
             base.VisitAssignmentExpression(node);
         }
 
@@ -208,25 +196,7 @@ public sealed class ReferenceWalker
             AddForEachInfo(info, node);
 
             // foreach (var (a, b) in xs) additionally deconstructs each element.
-            var designation = node.DescendantNodes()
-                .OfType<ParenthesizedVariableDesignationSyntax>()
-                .FirstOrDefault();
-            if (designation != null)
-            {
-                var elementType = info.CurrentProperty?.Type;
-                if (elementType != null)
-                {
-                    var deconstruct = FindMethod(
-                        elementType,
-                        "Deconstruct",
-                        designation.Variables.Count
-                    );
-                    if (deconstruct != null)
-                    {
-                        AddReference(deconstruct, node);
-                    }
-                }
-            }
+            AddDeconstructionInfo(_semanticModel.GetDeconstructionInfo(node), node);
 
             base.VisitForEachVariableStatement(node);
         }
@@ -263,18 +233,15 @@ public sealed class ReferenceWalker
             }
         }
 
-        private void MarkDeconstructAsReferenced(ExpressionSyntax expression, int arity)
+        private void AddDeconstructionInfo(DeconstructionInfo info, SyntaxNode node)
         {
-            var type = _semanticModel.GetTypeInfo(expression, _cancellationToken).Type;
-            if (type == null)
+            if (info.Method != null)
             {
-                return;
+                AddReference(info.Method, node);
             }
-
-            var method = FindMethod(type, "Deconstruct", arity);
-            if (method != null)
+            foreach (var nested in info.Nested)
             {
-                AddReference(method, expression);
+                AddDeconstructionInfo(nested, node);
             }
         }
 

@@ -345,15 +345,4 @@ public sealed class ReportWriter
 
     private static string EscapeMarkdown(string value) =>
         value.Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
-
-    /// <summary>
-    /// Pluralizes a symbol-kind name for report headings. The previous code
-    /// just appended "s", which produced "Unused Propertys".
-    /// </summary>
-    private static string Pluralize(SymbolKind kind) =>
-        kind switch
-        {
-            SymbolKind.Property => "Properties",
-            _ => kind.ToString() + "s",
-        };
 }
